@@ -4,12 +4,11 @@
 
 当前版本已经具备首版核心闭环：
 
-- 绑定游戏昵称
 - 提交截图录入待确认记录
 - 确认或取消记录
 - 删除记录
-- 查询个人战绩
-- 查询最近比赛
+- 按游戏昵称查询个人战绩
+- 按游戏昵称查询最近比赛
 - 查询群排行
 
 ## 项目目标
@@ -32,14 +31,12 @@
 已实现：
 
 - `/网球 帮助`
-- `/网球 绑定 <游戏昵称>`
-- `/网球 别名`
 - `/网球 录入`
 - `/网球 确认 <记录号>`
 - `/网球 取消 <记录号>`
 - `/网球 删除 <记录号>`
-- `/网球 战绩`
-- `/网球 最近 [条数]`
+- `/网球 战绩 <游戏昵称>`
+- `/网球 最近 <游戏昵称> [条数]`
 - `/网球 排行 [指标] [人数]`
 
 已落地的基础设施：
@@ -49,7 +46,7 @@
 - SQLite 持久化
 - 图片本地归档
 - 待确认状态流转
-- 身份映射与别名绑定
+- 基于游戏昵称的统计聚合
 
 尚未完成：
 
@@ -140,16 +137,7 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 ## 使用说明
 
-### 1. 先绑定游戏昵称
-
-截图里识别到的是游戏昵称，不一定等于群昵称，所以建议先绑定：
-
-```text
-/网球 绑定 ntr
-/网球 别名
-```
-
-### 2. 提交比赛截图
+### 1. 提交比赛截图
 
 在群聊发送：
 
@@ -167,7 +155,7 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 - 生成一条 `pending` 记录
 - 返回识别预览和记录号
 
-### 3. 确认或取消
+### 2. 确认或取消
 
 收到预览后，可继续：
 
@@ -178,7 +166,7 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 只有确认后的记录才会进入正式统计。
 
-### 4. 删除记录
+### 3. 删除记录
 
 ```text
 /网球 删除 TEN-20260405-0001
@@ -191,19 +179,19 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 删除为软删除，后续统计会自动忽略该记录。
 
-### 5. 查询数据
+### 4. 查询数据
 
 个人战绩：
 
 ```text
-/网球 战绩
+/网球 战绩 ntr
 ```
 
 最近比赛：
 
 ```text
-/网球 最近
-/网球 最近 3
+/网球 最近 ntr
+/网球 最近 ntr 3
 ```
 
 群排行：
@@ -231,7 +219,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
   -> MessageParser 提取图片
   -> ImageStore 保存图片并计算 SHA256
   -> MultimodalExtractor 调用 LLM 提取 JSON
-  -> IdentityService 解析昵称绑定
   -> pending 记录写入 SQLite
   -> 用户确认 / 取消
   -> confirmed 记录进入正式统计
@@ -245,7 +232,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 - `groups`
 - `players`
-- `player_aliases`
 - `matches`
 - `match_player_stats`
 - `extraction_logs`
@@ -266,16 +252,15 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 - `python -m compileall main.py src`
 - SQLite schema 初始化
-- 昵称绑定 / 别名查询
 - 录入待确认链路
 - 确认 / 取消 / 删除状态流
-- 个人战绩 / 最近比赛 / 群排行聚合
+- 按游戏昵称的战绩 / 最近比赛 / 群排行聚合
 
 ### 注意事项
 
 - 插件默认按群维度建模，不做跨群身份合并
 - 统计仅基于 `confirmed` 且未删除的记录
-- 若未绑定昵称，个人查询和确认流程可能无法完成
+- 当前版本无需绑定昵称，查询时直接指定游戏内昵称
 - 真实多模态识别效果依赖 AstrBot 当前配置的 Provider 能否处理图片输入
 
 ## 后续计划

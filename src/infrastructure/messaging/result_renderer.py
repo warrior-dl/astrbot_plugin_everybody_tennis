@@ -12,36 +12,18 @@ class ResultRenderer:
             [
                 "网球插件当前可用命令：",
                 "/网球 帮助",
-                "/网球 绑定 <游戏昵称>",
-                "/网球 别名",
                 "/网球 录入",
                 "/网球 确认 <记录号>",
                 "/网球 取消 <记录号>",
                 "/网球 删除 <记录号>",
-                "/网球 战绩",
-                "/网球 最近 [条数]",
+                "/网球 战绩 <游戏昵称>",
+                "/网球 最近 <游戏昵称> [条数]",
                 "/网球 排行 [指标] [人数]",
                 "",
+                "当前版本无需绑定昵称，查询时直接指定游戏内昵称。",
                 "排行指标支持：胜场、胜率、场次、得分、胜球",
             ]
         )
-
-    @staticmethod
-    def alias_bind_text(*, alias: str, created: bool) -> str:
-        status = "已新增绑定" if created else "该昵称已绑定到你当前账号"
-        return f"{status}: {alias}"
-
-    @staticmethod
-    def alias_conflict_text(alias: str) -> str:
-        return f"昵称 `{alias}` 已被当前群内其他成员绑定，请先确认是否重名。"
-
-    @staticmethod
-    def alias_list_text(aliases: Sequence[str]) -> str:
-        if not aliases:
-            return "你还没有绑定任何游戏昵称。可使用 `/网球 绑定 <游戏昵称>` 进行绑定。"
-        lines = ["你当前绑定的游戏昵称："]
-        lines.extend(f"- {alias}" for alias in aliases)
-        return "\n".join(lines)
 
     @staticmethod
     def ingest_preview_text(preview: IngestPreview) -> str:
@@ -51,13 +33,11 @@ class ResultRenderer:
             f"状态: {preview.status}",
         ]
         for player in preview.players:
-            resolved = (
-                f"已匹配 {player.resolved_display_name}"
-                if player.resolved and player.resolved_display_name
-                else "未匹配"
-            )
+            display_name = player.raw_name
+            if player.resolved and player.resolved_display_name:
+                display_name = f"{player.raw_name} ({player.resolved_display_name})"
             lines.append(
-                f"玩家{player.side}: {player.raw_name} -> {resolved} | 点数 {player.points_won if player.points_won is not None else '?'}"
+                f"玩家{player.side}: {display_name} | 点数 {player.points_won if player.points_won is not None else '?'}"
             )
         if preview.set_count is not None or preview.game_count is not None:
             lines.append(

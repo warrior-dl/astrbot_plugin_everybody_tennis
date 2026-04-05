@@ -4,10 +4,6 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
-from .src.application.services.identity_service import (
-    AliasConflictError,
-    IdentityService,
-)
 from .src.application.services.confirmation_service import (
     ConfirmationError,
     ConfirmationService,
@@ -39,17 +35,14 @@ class EverybodyTennisPlugin(Star):
         self.config = config
         self._config_manager = ConfigManager(config)
         self._db = DatabaseManager(PLUGIN_NAME)
-        self._identity_service = IdentityService(self._db)
         self._message_parser = MessageParser()
         self._image_store = ImageStore(PLUGIN_NAME)
         self._extractor = MultimodalExtractor(self.context, self._config_manager)
         self._confirmation_service = ConfirmationService(
             db=self._db,
-            identity_service=self._identity_service,
         )
         self._query_service = QueryService(
             db=self._db,
-            identity_service=self._identity_service,
         )
         self._ranking_service = RankingService(
             db=self._db,
@@ -64,7 +57,6 @@ class EverybodyTennisPlugin(Star):
             config_manager=self._config_manager,
             extractor=self._extractor,
             image_store=self._image_store,
-            identity_service=self._identity_service,
         )
         self._initialized = False
         self._terminating = False
@@ -101,55 +93,6 @@ class EverybodyTennisPlugin(Star):
         """查看插件帮助"""
         await self._ensure_ready()
         yield event.plain_result(ResultRenderer.help_text())
-
-    @tennis.command("绑定")
-    async def tennis_bind(self, event: AstrMessageEvent, game_nickname: str):
-        """绑定当前用户的游戏昵称"""
-        await self._ensure_ready()
-        if not self._config_manager.is_group_only() and not event.get_group_id():
-            yield event.plain_result("当前配置允许私聊，但绑定逻辑仍需要群上下文。")
-            return
-        if not event.get_group_id():
-            yield event.plain_result("请在群聊中使用该命令。")
-            return
-
-        try:
-            result = await self._identity_service.bind_alias(
-                platform=event.get_platform_name(),
-                external_group_id=str(event.get_group_id()),
-                group_name="",
-                platform_user_id=str(event.get_sender_id()),
-                display_name=event.get_sender_name(),
-                alias=game_nickname,
-            )
-        except AliasConflictError as exc:
-            yield event.plain_result(ResultRenderer.alias_conflict_text(exc.alias))
-            return
-        except ValueError as exc:
-            yield event.plain_result(str(exc))
-            return
-
-        yield event.plain_result(
-            ResultRenderer.alias_bind_text(
-                alias=result.alias,
-                created=result.created,
-            )
-        )
-
-    @tennis.command("别名", alias={"昵称"})
-    async def tennis_aliases(self, event: AstrMessageEvent):
-        """查看当前用户已绑定的游戏昵称"""
-        await self._ensure_ready()
-        if not event.get_group_id():
-            yield event.plain_result("请在群聊中使用该命令。")
-            return
-
-        aliases = await self._identity_service.list_aliases(
-            platform=event.get_platform_name(),
-            external_group_id=str(event.get_group_id()),
-            platform_user_id=str(event.get_sender_id()),
-        )
-        yield event.plain_result(ResultRenderer.alias_list_text(aliases))
 
     @tennis.command("录入")
     async def tennis_ingest(self, event: AstrMessageEvent):
@@ -254,17 +197,20 @@ class EverybodyTennisPlugin(Star):
         yield event.plain_result(ResultRenderer.delete_success_text(result.message))
 
     @tennis.command("战绩")
-    async def tennis_stats(self, event: AstrMessageEvent):
+    async def tennis_stats(self, event: AstrMessageEvent, game_nickname: str = ""):
         """查看个人战绩"""
         await self._ensure_ready()
         if not event.get_group_id():
             yield event.plain_result("请在群聊中使用该命令。")
             return
+        if not game_nickname.strip():
+            yield event.plain_result("请使用 `/网球 战绩 <游戏昵称>` 查询。")
+            return
         try:
             summary = await self._query_service.get_player_stats(
                 platform=event.get_platform_name(),
                 external_group_id=str(event.get_group_id()),
-                platform_user_id=str(event.get_sender_id()),
+                game_nickname=game_nickname,
             )
         except QueryError as exc:
             yield event.plain_result(ResultRenderer.query_error_text(str(exc)))
@@ -272,18 +218,26 @@ class EverybodyTennisPlugin(Star):
         yield event.plain_result(ResultRenderer.player_stats_text(summary))
 
     @tennis.command("最近")
-    async def tennis_recent(self, event: AstrMessageEvent, count: int = 5):
+    async def tennis_recent(
+        self,
+        event: AstrMessageEvent,
+        game_nickname: str = "",
+        count: int = 5,
+    ):
         """查看最近比赛"""
         await self._ensure_ready()
         if not event.get_group_id():
             yield event.plain_result("请在群聊中使用该命令。")
+            return
+        if not game_nickname.strip():
+            yield event.plain_result("请使用 `/网球 最近 <游戏昵称> [条数]` 查询。")
             return
         safe_count = min(max(count, 1), 10)
         try:
             items = await self._query_service.get_recent_matches(
                 platform=event.get_platform_name(),
                 external_group_id=str(event.get_group_id()),
-                platform_user_id=str(event.get_sender_id()),
+                game_nickname=game_nickname,
                 limit=safe_count,
             )
         except QueryError as exc:

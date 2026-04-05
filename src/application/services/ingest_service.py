@@ -5,7 +5,6 @@ from uuid import uuid4
 from sqlalchemy import select
 
 from ..dto.ingest import IngestPlayerPreview, IngestPreview
-from .identity_service import IdentityService
 from ...infrastructure.config.config_manager import ConfigManager
 from ...infrastructure.llm.multimodal_extractor import MultimodalExtractor
 from ...infrastructure.persistence.db import DatabaseManager
@@ -21,13 +20,11 @@ class IngestService:
         config_manager: ConfigManager,
         extractor: MultimodalExtractor,
         image_store: ImageStore,
-        identity_service: IdentityService,
     ):
         self._db = db
         self._config_manager = config_manager
         self._extractor = extractor
         self._image_store = image_store
-        self._identity_service = identity_service
 
     async def ingest(
         self,
@@ -56,12 +53,6 @@ class IngestService:
                 platform=platform,
                 external_group_id=external_group_id,
                 group_name=group_name,
-            )
-            alias_resolution = await self._identity_service.resolve_aliases(
-                platform=platform,
-                external_group_id=external_group_id,
-                aliases=[player["name"] for player in extraction.normalized_payload["players"]],
-                session=session,
             )
 
             duplicate_of_match_id = await self._find_duplicate_match_id(
@@ -94,15 +85,12 @@ class IngestService:
             players_preview: list[IngestPlayerPreview] = []
             winner_side = extraction.normalized_payload.get("winner_side")
             for player_payload in extraction.normalized_payload["players"]:
-                resolved_player = alias_resolution.get(
-                    normalize_name(player_payload["name"])
-                )
                 stat = MatchPlayerStat(
                     match_id=match.id,
                     side=player_payload["side"],
                     raw_player_name=player_payload["name"],
                     normalized_player_name=normalize_name(player_payload["name"]),
-                    player_id=resolved_player.id if resolved_player else None,
+                    player_id=None,
                     is_winner=winner_side == player_payload["side"],
                     points_won=player_payload.get("points_won"),
                     winners=player_payload.get("winners"),
@@ -116,8 +104,8 @@ class IngestService:
                     IngestPlayerPreview(
                         side=player_payload["side"],
                         raw_name=player_payload["name"],
-                        resolved_display_name=resolved_player.display_name if resolved_player else None,
-                        resolved=resolved_player is not None,
+                        resolved_display_name=None,
+                        resolved=False,
                         points_won=player_payload.get("points_won"),
                         winners=player_payload.get("winners"),
                         serve_points_won=player_payload.get("serve_points_won"),
@@ -126,25 +114,6 @@ class IngestService:
                         net_play_rate=player_payload.get("net_play_rate"),
                     )
                 )
-
-            if len(players_preview) == 2 and winner_side in {1, 2}:
-                winner_preview = next(
-                    (player for player in players_preview if player.side == winner_side),
-                    None,
-                )
-                loser_preview = next(
-                    (player for player in players_preview if player.side != winner_side),
-                    None,
-                )
-                if winner_preview and loser_preview:
-                    if winner_preview.resolved_display_name:
-                        match.winner_player_id = alias_resolution[
-                            normalize_name(winner_preview.raw_name)
-                        ].id
-                    if loser_preview.resolved_display_name:
-                        match.loser_player_id = alias_resolution[
-                            normalize_name(loser_preview.raw_name)
-                        ].id
 
             await session.commit()
 

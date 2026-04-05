@@ -5,7 +5,7 @@ from sqlalchemy import select
 from ..dto.ranking import RankingEntry
 from ...infrastructure.config.config_manager import ConfigManager
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat, Player
+from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
 
 
 class RankingError(Exception):
@@ -55,18 +55,17 @@ class RankingService:
                 raise RankingError("当前群还没有任何比赛记录。")
 
             stmt = (
-                select(MatchPlayerStat, Match, Player)
+                select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
-                .join(Player, MatchPlayerStat.player_id == Player.id)
                 .where(Match.group_id == group.id)
                 .where(Match.status == "confirmed")
-                .where(MatchPlayerStat.player_id.is_not(None))
+                .order_by(Match.confirmed_at.desc(), Match.id.desc(), MatchPlayerStat.side.asc())
             )
             rows = (await session.execute(stmt)).all()
             if not rows:
                 raise RankingError("当前群还没有已确认的比赛记录。")
 
-            aggregates: dict[int, dict] = defaultdict(
+            aggregates: dict[str, dict] = defaultdict(
                 lambda: {
                     "display_name": "",
                     "matches": 0,
@@ -75,9 +74,13 @@ class RankingService:
                     "winners": 0,
                 }
             )
-            for stat, _match, player in rows:
-                bucket = aggregates[player.id]
-                bucket["display_name"] = player.display_name
+            for stat, _match in rows:
+                player_key = stat.normalized_player_name
+                if not player_key:
+                    continue
+                bucket = aggregates[player_key]
+                if not bucket["display_name"]:
+                    bucket["display_name"] = stat.raw_player_name
                 bucket["matches"] += 1
                 bucket["wins"] += 1 if stat.is_winner else 0
                 bucket["points"] += stat.points_won or 0
@@ -85,7 +88,7 @@ class RankingService:
 
             min_matches = self._config_manager.get_min_matches_for_win_rate()
             prepared: list[RankingEntry] = []
-            for player_id, bucket in aggregates.items():
+            for bucket in aggregates.values():
                 if metric_key == "win_rate" and bucket["matches"] < min_matches:
                     continue
                 value = self._metric_value(metric_key, bucket)

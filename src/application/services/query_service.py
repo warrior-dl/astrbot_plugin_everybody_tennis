@@ -1,9 +1,9 @@
 from sqlalchemy import select
 
 from ..dto.query import PlayerStatsSummary, RecentMatchItem
-from .identity_service import IdentityService
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Match, MatchPlayerStat, Player
+from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...shared.text import normalize_name
 
 
 class QueryError(Exception):
@@ -11,37 +11,40 @@ class QueryError(Exception):
 
 
 class QueryService:
-    def __init__(self, db: DatabaseManager, identity_service: IdentityService):
+    def __init__(self, db: DatabaseManager):
         self._db = db
-        self._identity_service = identity_service
 
     async def get_player_stats(
         self,
         *,
         platform: str,
         external_group_id: str,
-        platform_user_id: str,
+        game_nickname: str,
     ) -> PlayerStatsSummary:
+        normalized_name = normalize_name(game_nickname)
+        if not normalized_name:
+            raise QueryError("请在命令后指定游戏内昵称。")
+
         async with self._db.session() as session:
-            player = await self._identity_service.get_player_by_platform_user(
+            group = await self._get_group(
                 platform=platform,
                 external_group_id=external_group_id,
-                platform_user_id=platform_user_id,
                 session=session,
             )
-            if player is None:
-                raise QueryError("你还没有绑定游戏昵称，请先使用 `/网球 绑定 <游戏昵称>`。")
+            if group is None:
+                raise QueryError("当前群还没有任何比赛记录。")
 
             stmt = (
                 select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
-                .where(MatchPlayerStat.player_id == player.id)
+                .where(Match.group_id == group.id)
+                .where(MatchPlayerStat.normalized_player_name == normalized_name)
                 .where(Match.status == "confirmed")
                 .order_by(Match.confirmed_at.desc(), Match.id.desc())
             )
             rows = (await session.execute(stmt)).all()
             if not rows:
-                raise QueryError("你还没有已确认的比赛记录。")
+                raise QueryError(f"未找到昵称 `{game_nickname.strip()}` 的已确认比赛记录。")
 
             total_matches = len(rows)
             wins = sum(1 for stat, _match in rows if stat.is_winner)
@@ -55,7 +58,7 @@ class QueryService:
             ]
 
             return PlayerStatsSummary(
-                display_name=player.display_name,
+                display_name=rows[0][0].raw_player_name,
                 total_matches=total_matches,
                 wins=wins,
                 losses=total_matches - wins,
@@ -75,47 +78,46 @@ class QueryService:
         *,
         platform: str,
         external_group_id: str,
-        platform_user_id: str,
+        game_nickname: str,
         limit: int = 5,
     ) -> list[RecentMatchItem]:
+        normalized_name = normalize_name(game_nickname)
+        if not normalized_name:
+            raise QueryError("请在命令后指定游戏内昵称。")
+
         async with self._db.session() as session:
-            player = await self._identity_service.get_player_by_platform_user(
+            group = await self._get_group(
                 platform=platform,
                 external_group_id=external_group_id,
-                platform_user_id=platform_user_id,
                 session=session,
             )
-            if player is None:
-                raise QueryError("你还没有绑定游戏昵称，请先使用 `/网球 绑定 <游戏昵称>`。")
+            if group is None:
+                raise QueryError("当前群还没有任何比赛记录。")
 
             stmt = (
                 select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
-                .where(MatchPlayerStat.player_id == player.id)
+                .where(Match.group_id == group.id)
+                .where(MatchPlayerStat.normalized_player_name == normalized_name)
                 .where(Match.status == "confirmed")
                 .order_by(Match.confirmed_at.desc(), Match.id.desc())
                 .limit(limit)
             )
             rows = (await session.execute(stmt)).all()
             if not rows:
-                raise QueryError("你还没有已确认的比赛记录。")
+                raise QueryError(f"未找到昵称 `{game_nickname.strip()}` 的已确认比赛记录。")
 
             results: list[RecentMatchItem] = []
             for stat, match in rows:
                 opponent_stmt = (
-                    select(MatchPlayerStat, Player)
-                    .outerjoin(Player, MatchPlayerStat.player_id == Player.id)
+                    select(MatchPlayerStat)
                     .where(MatchPlayerStat.match_id == match.id)
                     .where(MatchPlayerStat.side != stat.side)
                     .limit(1)
                 )
                 opponent_row = (await session.execute(opponent_stmt)).first()
-                opponent_stat, opponent_player = opponent_row if opponent_row else (None, None)
-                opponent_name = (
-                    opponent_player.display_name
-                    if opponent_player is not None
-                    else (opponent_stat.raw_player_name if opponent_stat is not None else "未知对手")
-                )
+                opponent_stat = opponent_row[0] if opponent_row else None
+                opponent_name = opponent_stat.raw_player_name if opponent_stat is not None else "未知对手"
                 results.append(
                     RecentMatchItem(
                         match_code=match.match_code,
@@ -123,10 +125,22 @@ class QueryService:
                         is_winner=stat.is_winner,
                         opponent_name=opponent_name,
                         points_won=stat.points_won,
-                        opponent_points_won=(
-                            opponent_stat.points_won if opponent_stat is not None else None
-                        ),
+                        opponent_points_won=opponent_stat.points_won if opponent_stat is not None else None,
                         duration_seconds=match.duration_seconds,
                     )
                 )
             return results
+
+    async def _get_group(
+        self,
+        *,
+        platform: str,
+        external_group_id: str,
+        session,
+    ) -> Group | None:
+        stmt = (
+            select(Group)
+            .where(Group.platform == platform)
+            .where(Group.external_group_id == external_group_id)
+        )
+        return await session.scalar(stmt)

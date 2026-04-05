@@ -4,10 +4,8 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from .identity_service import IdentityService
 from ...infrastructure.persistence.db import DatabaseManager
 from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
-from ...shared.text import normalize_name
 
 
 class ConfirmationError(Exception):
@@ -22,9 +20,8 @@ class ConfirmationResult:
 
 
 class ConfirmationService:
-    def __init__(self, db: DatabaseManager, identity_service: IdentityService):
+    def __init__(self, db: DatabaseManager):
         self._db = db
-        self._identity_service = identity_service
 
     async def confirm(
         self,
@@ -61,23 +58,8 @@ class ConfirmationService:
                 raise ConfirmationError("该记录已过期，请重新录入。")
 
             stats = await self._get_match_stats(session=session, match_id=match.id)
-            alias_resolution = await self._identity_service.resolve_aliases(
-                platform=platform,
-                external_group_id=external_group_id,
-                aliases=[stat.raw_player_name for stat in stats],
-                session=session,
-            )
-            for stat in stats:
-                resolved = alias_resolution.get(normalize_name(stat.raw_player_name))
-                if resolved is not None:
-                    stat.player_id = resolved.id
 
             missing_fields = self._load_missing_fields(match.missing_fields_json)
-            unresolved_names = [stat.raw_player_name for stat in stats if stat.player_id is None]
-            if unresolved_names:
-                raise ConfirmationError(
-                    "仍有玩家未绑定昵称: " + ", ".join(unresolved_names)
-                )
             if missing_fields:
                 raise ConfirmationError(
                     "当前记录字段不完整，缺失: " + ", ".join(missing_fields)
