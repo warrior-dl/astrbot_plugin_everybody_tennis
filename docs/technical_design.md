@@ -345,7 +345,6 @@ AstrBot 内部消息片段支持 `TextPart` 和 `ImageURLPart`，因此提取器
   "game_count": 6,
   "duration_seconds": 233,
   "max_rally_count": 4,
-  "winner_side": 1,
   "missing_fields": [],
   "is_complete": true
 }
@@ -359,7 +358,7 @@ AstrBot 内部消息片段支持 `TextPart` 和 `ImageURLPart`，因此提取器
 - 把 `00:03:53` 转成秒数
 - 去除昵称两侧空白
 - 将无法解析的字段登记到 `missing_fields`
-- 根据分数字段推导 `winner_side`，若模型未显式给出
+- 根据双方 `points_won` 自动推导 `winner_side`，不依赖模型显式给出
 
 ### 9.5 失败处理
 

@@ -27,13 +27,16 @@ class MultimodalExtractor:
         unified_msg_origin: str,
         image_path: str,
     ) -> ExtractionResult:
-        provider_id = self._config_manager.get_provider_id()
+        configured_provider_id = self._config_manager.get_provider_id().strip()
+        provider_id = configured_provider_id
         if not provider_id:
             provider_id = await self._context.get_current_chat_provider_id(
                 unified_msg_origin
             )
         if not provider_id:
-            raise ExtractionError("未找到可用的多模态模型 Provider。")
+            raise ExtractionError(
+                "未找到可用的多模态模型 Provider。请先在插件配置 `llm.provider_id` 中选择一个支持图片输入的聊天模型。"
+            )
 
         prompt = self._build_user_prompt()
         try:
@@ -45,7 +48,13 @@ class MultimodalExtractor:
                 temperature=0,
             )
         except Exception as exc:
-            raise ExtractionError(f"调用多模态模型失败: {exc}") from exc
+            raise ExtractionError(
+                self._build_provider_error_message(
+                    exc=exc,
+                    provider_id=provider_id,
+                    configured=bool(configured_provider_id),
+                )
+            ) from exc
         raw_text = llm_resp.completion_text.strip()
         payload = self._extract_json_payload(raw_text)
         normalized = self._normalize_payload(payload)
@@ -54,6 +63,41 @@ class MultimodalExtractor:
             normalized_payload=normalized,
             missing_fields=normalized["missing_fields"],
         )
+
+    def _build_provider_error_message(
+        self,
+        *,
+        exc: Exception,
+        provider_id: str,
+        configured: bool,
+    ) -> str:
+        message = str(exc)
+        lowered = message.lower()
+
+        if "unknown variant `image_url`" in lowered or "expected `text`" in lowered:
+            prefix = (
+                f"插件当前配置的 Provider `{provider_id}` 不支持图片输入。"
+                if configured
+                else "当前未在插件中单独配置截图提取 Provider，且回退到会话 Provider 后发现其不支持图片输入。"
+            )
+            return (
+                prefix
+                + " 请在插件配置 `llm.provider_id` 中选择一个支持多模态看图的聊天模型后重试。"
+            )
+
+        if "429" in lowered or "余额不足" in message or "无可用资源包" in message:
+            return (
+                f"调用多模态模型失败，Provider `{provider_id}` 当前额度不足或请求受限。"
+                " 请检查对应模型账号余额、资源包或限流配置。"
+            )
+
+        if not configured:
+            return (
+                f"调用多模态模型失败: {message}"
+                "。当前未在插件中显式配置 `llm.provider_id`，建议改为手动选择一个支持图片输入的 Provider。"
+            )
+
+        return f"调用多模态模型失败: {message}"
 
     def _build_user_prompt(self) -> str:
         return "\n".join(
@@ -78,10 +122,10 @@ class MultimodalExtractor:
                 '  "game_count": 0,',
                 '  "duration_seconds": 0,',
                 '  "max_rally_count": 0,',
-                '  "winner_side": 1,',
                 '  "missing_fields": [],',
                 '  "is_complete": true',
                 "}",
+                "不要输出 winner_side，系统会根据双方 points_won 自动判定胜负。",
                 "如果原图里字段缺失，请把缺失字段写进 missing_fields，且不要编造数据。",
             ]
         )
@@ -135,9 +179,11 @@ class MultimodalExtractor:
                 }
             )
 
-        winner_side = self._as_int(payload.get("winner_side"))
-        if winner_side not in {1, 2}:
-            winner_side = self._derive_winner_side(normalized_players)
+        missing_fields = [
+            field for field in missing_fields if str(field).strip() != "winner_side"
+        ]
+
+        winner_side = self._derive_winner_side(normalized_players)
         if winner_side not in {1, 2}:
             missing_fields.append("winner_side")
 

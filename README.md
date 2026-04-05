@@ -116,9 +116,11 @@ data/plugins/astrbot_plugin_everybody_tennis/
 - `basic.enabled`：启用插件
 - `basic.group_only`：仅允许群聊使用
 - `basic.allow_submitter_delete`：允许提交人删除自己的记录
-- `llm.provider_id`：指定用于截图提取的多模态 Provider
+- `llm.provider_id`：指定用于截图提取的多模态 Provider，必须选择支持看图的聊天模型
 - `storage.pending_expire_hours`：待确认记录过期时间
 - `ranking.min_matches_for_win_rate`：胜率榜最少比赛场次
+
+如果执行 `/网球 录入` 时出现“Provider 不支持图片输入”或类似 `image_url` 反序列化错误，通常表示这里没有配置成支持多模态图片输入的模型。
 
 ### 4. 数据存储位置
 
