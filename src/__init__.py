@@ -1,0 +1,2 @@
+"""Everybody Tennis plugin package."""
+
