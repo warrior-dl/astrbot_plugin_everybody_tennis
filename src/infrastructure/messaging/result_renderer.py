@@ -13,13 +13,13 @@ class ResultRenderer:
                 "网球插件当前可用命令：",
                 "/网球 帮助",
                 "/网球 录入",
-                "/网球 确认 <记录号>",
                 "/网球 取消 <记录号>",
                 "/网球 删除 <记录号>",
                 "/网球 战绩 <游戏昵称>",
                 "/网球 最近 <游戏昵称> [条数]",
                 "/网球 排行 [指标] [人数]",
                 "",
+                "默认完整记录会直接入库，发现有误可再取消。",
                 "当前版本无需绑定昵称，查询时直接指定游戏内昵称。",
                 "排行指标支持：胜场、胜率、场次、得分、胜球",
             ]
@@ -52,17 +52,24 @@ class ResultRenderer:
             + ("无" if not preview.missing_fields else ", ".join(preview.missing_fields))
         )
         if preview.duplicate_hint:
-            lines.append("提示: 该截图与历史记录疑似重复，请确认后再入库。")
-        if preview.expires_at is not None:
+            lines.append("提示: 该截图与历史记录疑似重复，请留意是否重复录入。")
+        if preview.auto_confirmed:
+            lines.extend(
+                [
+                    "结果: 记录已自动确认并入库。",
+                    f"如需撤销，请发送 `/网球 取消 {preview.match_code}`",
+                ]
+            )
+        elif preview.expires_at is not None:
             lines.append(
                 f"待确认截止: {preview.expires_at.strftime('%Y-%m-%d %H:%M:%S')} UTC"
             )
-        lines.extend(
-            [
-                "",
-                f"请发送 `/网球 确认 {preview.match_code}` 或 `/网球 取消 {preview.match_code}`",
-            ]
-        )
+            lines.extend(
+                [
+                    "",
+                    f"请发送 `/网球 确认 {preview.match_code}` 或 `/网球 取消 {preview.match_code}`",
+                ]
+            )
         return "\n".join(lines)
 
     @staticmethod

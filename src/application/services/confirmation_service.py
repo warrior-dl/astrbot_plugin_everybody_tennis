@@ -49,6 +49,8 @@ class ConfirmationService:
                 raise ConfirmationError("未找到对应记录号。")
             if match.submitted_by_user_id != operator_user_id:
                 raise ConfirmationError("当前版本仅允许提交人确认自己的记录。")
+            if match.status == "confirmed":
+                raise ConfirmationError("该记录已自动入库，无需再次确认。")
             if match.status != "pending":
                 raise ConfirmationError(f"该记录当前状态为 {match.status}，不能再次确认。")
 
@@ -107,16 +109,19 @@ class ConfirmationService:
                 raise ConfirmationError("未找到对应记录号。")
             if match.submitted_by_user_id != operator_user_id:
                 raise ConfirmationError("当前版本仅允许提交人取消自己的记录。")
-            if match.status != "pending":
+            if match.status not in {"pending", "confirmed"}:
                 raise ConfirmationError(f"该记录当前状态为 {match.status}，不能取消。")
 
+            original_status = match.status
             match.status = "cancelled"
             match.cancelled_at = datetime.utcnow()
+            if original_status == "confirmed":
+                match.confirmed_at = None
             await session.commit()
             return ConfirmationResult(
                 match_code=match.match_code,
                 status=match.status,
-                message="记录已取消，不会进入正式统计。",
+                message="记录已取消，后续统计将不再包含该记录。",
             )
 
     async def _get_group(self, *, session, platform: str, external_group_id: str) -> Group | None:

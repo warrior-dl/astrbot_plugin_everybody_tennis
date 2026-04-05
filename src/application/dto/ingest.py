@@ -28,4 +28,4 @@ class IngestPreview:
     missing_fields: list[str]
     duplicate_hint: bool
     expires_at: datetime | None
-
+    auto_confirmed: bool

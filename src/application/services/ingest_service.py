@@ -42,6 +42,9 @@ class IngestService:
             unified_msg_origin=unified_msg_origin,
             image_path=saved_image.saved_path,
         )
+        missing_fields = list(extraction.missing_fields)
+        winner_side = extraction.normalized_payload.get("winner_side")
+        auto_confirmed = not missing_fields and winner_side in {1, 2}
 
         expires_at = datetime.utcnow() + timedelta(
             hours=self._config_manager.get_pending_expire_hours()
@@ -64,26 +67,26 @@ class IngestService:
             match = Match(
                 match_code=match_code,
                 group_id=group.id,
-                status="pending",
+                status="confirmed" if auto_confirmed else "pending",
                 submitted_by_user_id=platform_user_id,
                 submitted_by_name=submitted_by_name,
                 source_image_path=saved_image.saved_path,
                 source_image_sha256=saved_image.sha256,
                 raw_extraction_json=extraction.raw_text,
                 normalized_json=json.dumps(extraction.normalized_payload, ensure_ascii=False),
-                missing_fields_json=json.dumps(extraction.missing_fields, ensure_ascii=False),
+                missing_fields_json=json.dumps(missing_fields, ensure_ascii=False),
                 duplicate_of_match_id=duplicate_of_match_id,
                 set_count=extraction.normalized_payload.get("set_count"),
                 game_count=extraction.normalized_payload.get("game_count"),
                 duration_seconds=extraction.normalized_payload.get("duration_seconds"),
                 max_rally_count=extraction.normalized_payload.get("max_rally_count"),
-                expires_at=expires_at,
+                expires_at=None if auto_confirmed else expires_at,
+                confirmed_at=datetime.utcnow() if auto_confirmed else None,
             )
             session.add(match)
             await session.flush()
 
             players_preview: list[IngestPlayerPreview] = []
-            winner_side = extraction.normalized_payload.get("winner_side")
             for player_payload in extraction.normalized_payload["players"]:
                 stat = MatchPlayerStat(
                     match_id=match.id,
@@ -119,15 +122,16 @@ class IngestService:
 
         return IngestPreview(
             match_code=match_code,
-            status="pending",
+            status="confirmed" if auto_confirmed else "pending",
             players=players_preview,
             set_count=extraction.normalized_payload.get("set_count"),
             game_count=extraction.normalized_payload.get("game_count"),
             duration_seconds=extraction.normalized_payload.get("duration_seconds"),
             max_rally_count=extraction.normalized_payload.get("max_rally_count"),
-            missing_fields=extraction.missing_fields,
+            missing_fields=missing_fields,
             duplicate_hint=duplicate_of_match_id is not None,
-            expires_at=expires_at,
+            expires_at=None if auto_confirmed else expires_at,
+            auto_confirmed=auto_confirmed,
         )
 
     async def _get_or_create_group(
