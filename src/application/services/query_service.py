@@ -1,9 +1,9 @@
 from sqlalchemy import select
 
-from src.application.dto.query import PlayerStatsSummary, RecentMatchItem
-from src.application.services.identity_service import IdentityService
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.persistence.models import Match, MatchPlayerStat, Player
+from ..dto.query import PlayerStatsSummary, RecentMatchItem
+from .identity_service import IdentityService
+from ...infrastructure.persistence.db import DatabaseManager
+from ...infrastructure.persistence.models import Match, MatchPlayerStat, Player
 
 
 class QueryError(Exception):

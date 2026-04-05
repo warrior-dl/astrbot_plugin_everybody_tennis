@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-from src.application.dto.ingest import IngestPreview
-from src.application.dto.query import PlayerStatsSummary, RecentMatchItem
-from src.application.dto.ranking import RankingEntry
+from ...application.dto.ingest import IngestPreview
+from ...application.dto.query import PlayerStatsSummary, RecentMatchItem
+from ...application.dto.ranking import RankingEntry
 
 
 class ResultRenderer:

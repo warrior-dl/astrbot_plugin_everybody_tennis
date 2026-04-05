@@ -4,24 +4,24 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
-from src.application.services.identity_service import (
+from .src.application.services.identity_service import (
     AliasConflictError,
     IdentityService,
 )
-from src.application.services.confirmation_service import (
+from .src.application.services.confirmation_service import (
     ConfirmationError,
     ConfirmationService,
 )
-from src.application.services.ingest_service import IngestService
-from src.application.services.query_service import QueryError, QueryService
-from src.application.services.ranking_service import RankingError, RankingService
-from src.application.services.delete_service import DeleteError, DeleteService
-from src.infrastructure.config.config_manager import ConfigManager
-from src.infrastructure.llm.multimodal_extractor import ExtractionError, MultimodalExtractor
-from src.infrastructure.messaging.result_renderer import ResultRenderer
-from src.infrastructure.platform.message_parser import MessageParser, MessageParserError
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.storage.image_store import ImageStore
+from .src.application.services.ingest_service import IngestService
+from .src.application.services.query_service import QueryError, QueryService
+from .src.application.services.ranking_service import RankingError, RankingService
+from .src.application.services.delete_service import DeleteError, DeleteService
+from .src.infrastructure.config.config_manager import ConfigManager
+from .src.infrastructure.llm.multimodal_extractor import ExtractionError, MultimodalExtractor
+from .src.infrastructure.messaging.result_renderer import ResultRenderer
+from .src.infrastructure.platform.message_parser import MessageParser, MessageParserError
+from .src.infrastructure.persistence.db import DatabaseManager
+from .src.infrastructure.storage.image_store import ImageStore
 
 PLUGIN_NAME = "astrbot_plugin_everybody_tennis"
 

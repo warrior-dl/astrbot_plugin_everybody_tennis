@@ -4,10 +4,10 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from src.application.services.identity_service import IdentityService
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.persistence.models import Group, Match, MatchPlayerStat
-from src.shared.text import normalize_name
+from .identity_service import IdentityService
+from ...infrastructure.persistence.db import DatabaseManager
+from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...shared.text import normalize_name
 
 
 class ConfirmationError(Exception):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from src.infrastructure.persistence.db import get_plugin_data_root
+from ..persistence.db import get_plugin_data_root
 
 
 @dataclass(slots=True)

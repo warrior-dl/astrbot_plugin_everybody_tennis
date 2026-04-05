@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.infrastructure.persistence.models import Base
+from .models import Base
 
 
 def get_plugin_data_root() -> Path:

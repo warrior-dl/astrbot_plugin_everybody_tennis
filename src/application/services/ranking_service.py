@@ -2,10 +2,10 @@ from collections import defaultdict
 
 from sqlalchemy import select
 
-from src.application.dto.ranking import RankingEntry
-from src.infrastructure.config.config_manager import ConfigManager
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.persistence.models import Group, Match, MatchPlayerStat, Player
+from ..dto.ranking import RankingEntry
+from ...infrastructure.config.config_manager import ConfigManager
+from ...infrastructure.persistence.db import DatabaseManager
+from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat, Player
 
 
 class RankingError(Exception):

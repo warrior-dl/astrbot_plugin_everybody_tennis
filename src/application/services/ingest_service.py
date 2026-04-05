@@ -4,14 +4,14 @@ from uuid import uuid4
 
 from sqlalchemy import select
 
-from src.application.dto.ingest import IngestPlayerPreview, IngestPreview
-from src.application.services.identity_service import IdentityService
-from src.infrastructure.config.config_manager import ConfigManager
-from src.infrastructure.llm.multimodal_extractor import MultimodalExtractor
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.persistence.models import Group, Match, MatchPlayerStat
-from src.infrastructure.storage.image_store import ImageStore
-from src.shared.text import normalize_name
+from ..dto.ingest import IngestPlayerPreview, IngestPreview
+from .identity_service import IdentityService
+from ...infrastructure.config.config_manager import ConfigManager
+from ...infrastructure.llm.multimodal_extractor import MultimodalExtractor
+from ...infrastructure.persistence.db import DatabaseManager
+from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...infrastructure.storage.image_store import ImageStore
+from ...shared.text import normalize_name
 
 
 class IngestService:

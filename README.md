@@ -1,4 +1,4 @@
-# 全民网球战绩插件
+# 大众网球战绩插件
 
 `astrbot_plugin_everybody_tennis` 是一个 AstrBot 群聊插件，用来收集网球游戏对战截图，借助多模态 LLM 提取结构化比赛数据，并沉淀个人战绩与群排行。
 

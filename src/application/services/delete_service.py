@@ -3,9 +3,9 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from src.infrastructure.config.config_manager import ConfigManager
-from src.infrastructure.persistence.db import DatabaseManager
-from src.infrastructure.persistence.models import Group, Match
+from ...infrastructure.config.config_manager import ConfigManager
+from ...infrastructure.persistence.db import DatabaseManager
+from ...infrastructure.persistence.models import Group, Match
 
 
 class DeleteError(Exception):

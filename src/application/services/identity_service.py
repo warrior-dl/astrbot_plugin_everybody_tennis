@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import select
 
-from src.infrastructure.persistence.models import Group, Player, PlayerAlias
-from src.infrastructure.persistence.db import DatabaseManager
-from src.shared.text import normalize_name
+from ...infrastructure.persistence.models import Group, Player, PlayerAlias
+from ...infrastructure.persistence.db import DatabaseManager
+from ...shared.text import normalize_name
 
 
 class AliasConflictError(Exception):

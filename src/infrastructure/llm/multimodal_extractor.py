@@ -2,7 +2,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from src.infrastructure.config.config_manager import ConfigManager
+from ..config.config_manager import ConfigManager
 
 
 class ExtractionError(Exception):
