@@ -1,6 +1,7 @@
 from ..dto.query import PlayerStatsSummary, RecentMatchItem
 from ...infrastructure.persistence.db import DatabaseManager
 from ...infrastructure.persistence.models import Match, MatchPlayerStat
+from ...shared.match_types import MATCH_TYPE_SINGLES
 from ...shared.text import normalize_name
 from ._scope import GroupScopedLookup
 from sqlalchemy import select
@@ -38,6 +39,7 @@ class QueryService(GroupScopedLookup):
                 select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
                 .where(Match.group_id == group.id)
+                .where(Match.match_type == MATCH_TYPE_SINGLES)
                 .where(MatchPlayerStat.normalized_player_name == normalized_name)
                 .where(Match.status == "confirmed")
                 .order_by(Match.confirmed_at.desc(), Match.id.desc())
@@ -102,6 +104,7 @@ class QueryService(GroupScopedLookup):
                 select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
                 .where(Match.group_id == group.id)
+                .where(Match.match_type == MATCH_TYPE_SINGLES)
                 .where(MatchPlayerStat.normalized_player_name == normalized_name)
                 .where(Match.status == "confirmed")
                 .order_by(Match.confirmed_at.desc(), Match.id.desc())

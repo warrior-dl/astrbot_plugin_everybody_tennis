@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from ...application.dto.ingest import IngestPreview
 from ...application.dto.query import PlayerStatsSummary, RecentMatchItem
 from ...application.dto.ranking import RankingEntry
+from ...shared.match_types import MATCH_TYPE_DOUBLES, match_type_label
 
 
 class ResultRenderer:
@@ -13,6 +14,7 @@ class ResultRenderer:
                 "网球插件当前可用命令：",
                 "/网球 帮助",
                 "/网球 录入",
+                "/网球 双打录入",
                 "/网球 确认 <记录号>",
                 "/网球 取消 <记录号>",
                 "/网球 删除 <记录号>",
@@ -22,6 +24,7 @@ class ResultRenderer:
                 "",
                 "默认完整记录会直接入库，发现有误可再取消。",
                 "当前版本无需绑定昵称，查询时直接指定游戏内昵称。",
+                "当前双打处于首阶段，仅支持录入。",
                 "排行指标支持：胜场、胜率、场次、场均得分、场均胜球",
             ]
         )
@@ -29,14 +32,17 @@ class ResultRenderer:
     @staticmethod
     def ingest_preview_text(preview: IngestPreview) -> str:
         lines = [
-            "网球记录预览",
+            f"网球{match_type_label(preview.match_type)}记录预览",
             f"记录号: {preview.match_code}",
             f"状态: {preview.status}",
         ]
-        for player in preview.players:
-            lines.append(
-                f"玩家{player.side}: {player.raw_name} | 点数 {player.points_won if player.points_won is not None else '?'}"
-            )
+        if preview.match_type == MATCH_TYPE_DOUBLES:
+            lines.extend(ResultRenderer._doubles_players_lines(preview))
+        else:
+            for player in preview.players:
+                lines.append(
+                    f"玩家{player.side}: {player.raw_name} | 点数 {player.points_won if player.points_won is not None else '?'}"
+                )
         if preview.set_count is not None or preview.game_count is not None:
             lines.append(
                 f"盘/局: {preview.set_count if preview.set_count is not None else '?'}盘 {preview.game_count if preview.game_count is not None else '?'}局"
@@ -69,6 +75,30 @@ class ResultRenderer:
                 ]
             )
         return "\n".join(lines)
+
+    @staticmethod
+    def _doubles_players_lines(preview: IngestPreview) -> list[str]:
+        lines: list[str] = []
+        for side in (1, 2):
+            team_players = [player for player in preview.players if player.side == side]
+            team_names = " / ".join(player.raw_name for player in team_players) or "未知"
+            team_points = (
+                sum(player.points_won for player in team_players if player.points_won is not None)
+                if all(player.points_won is not None for player in team_players)
+                else None
+            )
+            lines.append(
+                f"队伍{side}: {team_names} | 总点数 {team_points if team_points is not None else '?'}"
+            )
+            for player in team_players:
+                detail = [
+                    f"玩家{player.player_slot}: {player.raw_name}",
+                    f"点数 {player.points_won if player.points_won is not None else '?'}",
+                ]
+                if player.max_serve_speed_kmh is not None:
+                    detail.append(f"最高球速 {player.max_serve_speed_kmh}km/h")
+                lines.append("  - " + " | ".join(detail))
+        return lines
 
     @staticmethod
     def ingest_error_text(message: str) -> str:

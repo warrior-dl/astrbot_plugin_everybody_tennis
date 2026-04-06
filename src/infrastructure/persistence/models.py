@@ -35,6 +35,7 @@ class Match(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     match_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
+    match_type: Mapped[str] = mapped_column(String(32), nullable=False, default="singles")
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     submitted_by_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
     submitted_by_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -64,12 +65,18 @@ class Match(Base):
 class MatchPlayerStat(Base):
     __tablename__ = "match_player_stats"
     __table_args__ = (
-        UniqueConstraint("match_id", "side", name="uq_match_player_stats_match_side"),
+        UniqueConstraint(
+            "match_id",
+            "side",
+            "player_slot",
+            name="uq_match_player_stats_match_side_slot",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), nullable=False)
     side: Mapped[int] = mapped_column(Integer, nullable=False)
+    player_slot: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_player_name: Mapped[str] = mapped_column(String(255), nullable=False)
     normalized_player_name: Mapped[str] = mapped_column(String(255), nullable=False)
     is_winner: Mapped[bool] = mapped_column(nullable=False, default=False)
@@ -79,4 +86,5 @@ class MatchPlayerStat(Base):
     errors: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_faults: Mapped[int | None] = mapped_column(Integer, nullable=True)
     net_play_rate: Mapped[float | None] = mapped_column(nullable=True)
+    max_serve_speed_kmh: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

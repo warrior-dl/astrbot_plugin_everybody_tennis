@@ -120,7 +120,7 @@ class ConfirmationService(GroupScopedLookup):
         stmt = (
             select(MatchPlayerStat)
             .where(MatchPlayerStat.match_id == match_id)
-            .order_by(MatchPlayerStat.side.asc())
+            .order_by(MatchPlayerStat.side.asc(), MatchPlayerStat.player_slot.asc())
         )
         result = await session.scalars(stmt)
         return list(result.all())

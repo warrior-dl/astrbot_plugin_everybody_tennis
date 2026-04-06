@@ -10,6 +10,7 @@ from ...infrastructure.llm.multimodal_extractor import MultimodalExtractor
 from ...infrastructure.persistence.db import DatabaseManager
 from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
 from ...infrastructure.storage.image_store import ImageStore
+from ...shared.match_types import MATCH_TYPE_SINGLES
 from ...shared.text import normalize_name
 from ...shared.time import utc_now
 
@@ -30,6 +31,7 @@ class IngestService:
     async def ingest(
         self,
         *,
+        match_type: str = MATCH_TYPE_SINGLES,
         platform: str,
         external_group_id: str,
         group_name: str,
@@ -40,6 +42,7 @@ class IngestService:
     ) -> IngestPreview:
         saved_image = await self._image_store.save_image(source_image_path)
         extraction = await self._extractor.extract(
+            match_type=match_type,
             unified_msg_origin=unified_msg_origin,
             image_path=saved_image.saved_path,
         )
@@ -68,6 +71,7 @@ class IngestService:
             match = Match(
                 match_code=match_code,
                 group_id=group.id,
+                match_type=match_type,
                 status="confirmed" if auto_confirmed else "pending",
                 submitted_by_user_id=platform_user_id,
                 submitted_by_name=submitted_by_name,
@@ -88,10 +92,12 @@ class IngestService:
             await session.flush()
 
             players_preview: list[IngestPlayerPreview] = []
-            for player_payload in extraction.normalized_payload["players"]:
+            for index, player_payload in enumerate(extraction.normalized_payload["players"], start=1):
+                player_slot = player_payload.get("player_slot") or index
                 stat = MatchPlayerStat(
                     match_id=match.id,
                     side=player_payload["side"],
+                    player_slot=player_slot,
                     raw_player_name=player_payload["name"],
                     normalized_player_name=normalize_name(player_payload["name"]),
                     is_winner=winner_side == player_payload["side"],
@@ -101,11 +107,13 @@ class IngestService:
                     errors=player_payload.get("errors"),
                     double_faults=player_payload.get("double_faults"),
                     net_play_rate=player_payload.get("net_play_rate"),
+                    max_serve_speed_kmh=player_payload.get("max_serve_speed_kmh"),
                 )
                 session.add(stat)
                 players_preview.append(
                     IngestPlayerPreview(
                         side=player_payload["side"],
+                        player_slot=player_slot,
                         raw_name=player_payload["name"],
                         points_won=player_payload.get("points_won"),
                         winners=player_payload.get("winners"),
@@ -113,6 +121,7 @@ class IngestService:
                         errors=player_payload.get("errors"),
                         double_faults=player_payload.get("double_faults"),
                         net_play_rate=player_payload.get("net_play_rate"),
+                        max_serve_speed_kmh=player_payload.get("max_serve_speed_kmh"),
                     )
                 )
 
@@ -120,6 +129,7 @@ class IngestService:
 
         return IngestPreview(
             match_code=match_code,
+            match_type=match_type,
             status="confirmed" if auto_confirmed else "pending",
             players=players_preview,
             set_count=extraction.normalized_payload.get("set_count"),

@@ -6,6 +6,7 @@ from ..dto.ranking import RankingEntry
 from ...infrastructure.config.config_manager import ConfigManager
 from ...infrastructure.persistence.db import DatabaseManager
 from ...infrastructure.persistence.models import Match, MatchPlayerStat
+from ...shared.match_types import MATCH_TYPE_SINGLES
 from ._scope import GroupScopedLookup
 
 
@@ -62,6 +63,7 @@ class RankingService(GroupScopedLookup):
                 select(MatchPlayerStat, Match)
                 .join(Match, MatchPlayerStat.match_id == Match.id)
                 .where(Match.group_id == group.id)
+                .where(Match.match_type == MATCH_TYPE_SINGLES)
                 .where(Match.status == "confirmed")
                 .order_by(Match.confirmed_at.desc(), Match.id.desc(), MatchPlayerStat.side.asc())
             )

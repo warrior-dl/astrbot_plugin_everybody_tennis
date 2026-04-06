@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 
 from ..config.config_manager import ConfigManager
+from ...shared.match_types import MATCH_TYPE_DOUBLES, MATCH_TYPE_SINGLES
 
 
 class ExtractionError(Exception):
@@ -24,6 +25,7 @@ class MultimodalExtractor:
     async def extract(
         self,
         *,
+        match_type: str,
         unified_msg_origin: str,
         image_path: str,
     ) -> ExtractionResult:
@@ -38,7 +40,7 @@ class MultimodalExtractor:
                 "未找到可用的多模态模型 Provider。请先在插件配置 `llm.provider_id` 中选择一个支持图片输入的聊天模型。"
             )
 
-        prompt = self._build_user_prompt()
+        prompt = self._build_user_prompt(match_type)
         try:
             llm_resp = await self._context.llm_generate(
                 chat_provider_id=provider_id,
@@ -57,7 +59,7 @@ class MultimodalExtractor:
             ) from exc
         raw_text = llm_resp.completion_text.strip()
         payload = self._extract_json_payload(raw_text)
-        normalized = self._normalize_payload(payload)
+        normalized = self._normalize_payload(payload, match_type)
         return ExtractionResult(
             raw_text=raw_text,
             normalized_payload=normalized,
@@ -99,36 +101,70 @@ class MultimodalExtractor:
 
         return f"调用多模态模型失败: {message}"
 
-    def _build_user_prompt(self) -> str:
-        return "\n".join(
-            [
-                self._config_manager.get_extraction_user_prompt_template(),
-                "",
-                "请严格输出 JSON 对象，字段如下：",
-                "{",
-                '  "players": [',
-                "    {",
-                '      "side": 1,',
-                '      "name": "string",',
-                '      "points_won": 0,',
-                '      "winners": 0,',
-                '      "serve_points_won": 0,',
-                '      "errors": 0,',
-                '      "double_faults": 0,',
-                '      "net_play_rate": 0.0',
-                "    }",
-                "  ],",
-                '  "set_count": 0,',
-                '  "game_count": 0,',
-                '  "duration_seconds": 0,',
-                '  "max_rally_count": 0,',
-                '  "missing_fields": [],',
-                '  "is_complete": true',
-                "}",
-                "不要输出 winner_side，系统会根据双方 points_won 自动判定胜负。",
-                "如果原图里字段缺失，请把缺失字段写进 missing_fields，且不要编造数据。",
-            ]
-        )
+    def _build_user_prompt(self, match_type: str) -> str:
+        lines = [
+            self._config_manager.get_extraction_user_prompt_template(),
+            "",
+            f"当前识别模式: {'双打' if match_type == MATCH_TYPE_DOUBLES else '单打'}。",
+            "请严格输出 JSON 对象。",
+        ]
+        if match_type == MATCH_TYPE_DOUBLES:
+            lines.extend(
+                [
+                    "players 必须输出 4 个对象，并按截图中的玩家顺序排列。",
+                    "前两个玩家视为队伍1，后两个玩家视为队伍2。",
+                    "{",
+                    '  "players": [',
+                    "    {",
+                    '      "name": "string",',
+                    '      "points_won": 0,',
+                    '      "winners": 0,',
+                    '      "serve_points_won": 0,',
+                    '      "errors": 0,',
+                    '      "double_faults": 0,',
+                    '      "net_play_rate": 0.0,',
+                    '      "max_serve_speed_kmh": 0',
+                    "    }",
+                    "  ],",
+                    '  "set_count": 0,',
+                    '  "game_count": 0,',
+                    '  "duration_seconds": 0,',
+                    '  "max_rally_count": 0,',
+                    '  "missing_fields": [],',
+                    '  "is_complete": true',
+                    "}",
+                    "不要输出 winner_side，系统会根据同队两人的 points_won 总和自动判定胜负。",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "players 必须输出 2 个对象。",
+                    "{",
+                    '  "players": [',
+                    "    {",
+                    '      "side": 1,',
+                    '      "name": "string",',
+                    '      "points_won": 0,',
+                    '      "winners": 0,',
+                    '      "serve_points_won": 0,',
+                    '      "errors": 0,',
+                    '      "double_faults": 0,',
+                    '      "net_play_rate": 0.0',
+                    "    }",
+                    "  ],",
+                    '  "set_count": 0,',
+                    '  "game_count": 0,',
+                    '  "duration_seconds": 0,',
+                    '  "max_rally_count": 0,',
+                    '  "missing_fields": [],',
+                    '  "is_complete": true',
+                    "}",
+                    "不要输出 winner_side，系统会根据双方 points_won 自动判定胜负。",
+                ]
+            )
+        lines.append("如果原图里字段缺失，请把缺失字段写进 missing_fields，且不要编造数据。")
+        return "\n".join(lines)
 
     def _extract_json_payload(self, text: str) -> dict:
         stripped = text.strip()
@@ -147,9 +183,10 @@ class MultimodalExtractor:
 
         raise ExtractionError("模型输出不是可解析的 JSON。")
 
-    def _normalize_payload(self, payload: dict) -> dict:
+    def _normalize_payload(self, payload: dict, match_type: str) -> dict:
         players = payload.get("players")
-        if not isinstance(players, list) or len(players) != 2:
+        expected_count = 4 if match_type == MATCH_TYPE_DOUBLES else 2
+        if not isinstance(players, list) or len(players) != expected_count:
             raise ExtractionError("模型输出中的 players 字段无效。")
 
         normalized_players = []
@@ -166,9 +203,11 @@ class MultimodalExtractor:
             name = str(player.get("name", "")).strip()
             if not name:
                 missing_fields.append(f"players[{index}].name")
+            side = self._player_side(match_type=match_type, index=index, player=player)
             normalized_players.append(
                 {
-                    "side": self._as_int(player.get("side"), default=index),
+                    "side": side,
+                    "player_slot": index,
                     "name": name,
                     "points_won": self._as_int(player.get("points_won")),
                     "winners": self._as_int(player.get("winners")),
@@ -176,6 +215,7 @@ class MultimodalExtractor:
                     "errors": self._as_int(player.get("errors")),
                     "double_faults": self._as_int(player.get("double_faults")),
                     "net_play_rate": self._as_rate(player.get("net_play_rate")),
+                    "max_serve_speed_kmh": self._as_int(player.get("max_serve_speed_kmh")),
                 }
             )
 
@@ -183,11 +223,12 @@ class MultimodalExtractor:
             field for field in missing_fields if str(field).strip() != "winner_side"
         ]
 
-        winner_side = self._derive_winner_side(normalized_players)
+        winner_side = self._derive_winner_side(normalized_players, match_type)
         if winner_side not in {1, 2}:
             missing_fields.append("winner_side")
 
         normalized = {
+            "match_type": match_type,
             "players": normalized_players,
             "set_count": self._as_int(payload.get("set_count")),
             "game_count": self._as_int(payload.get("game_count")),
@@ -199,7 +240,21 @@ class MultimodalExtractor:
         }
         return normalized
 
-    def _derive_winner_side(self, players: list[dict]) -> int | None:
+    def _player_side(self, *, match_type: str, index: int, player: dict) -> int:
+        if match_type == MATCH_TYPE_DOUBLES:
+            return 1 if index <= 2 else 2
+        return self._as_int(player.get("side"), default=index) or index
+
+    def _derive_winner_side(self, players: list[dict], match_type: str) -> int | None:
+        if match_type == MATCH_TYPE_DOUBLES:
+            team1_points = self._team_points_total(players, side=1)
+            team2_points = self._team_points_total(players, side=2)
+            if team1_points is None or team2_points is None:
+                return None
+            if team1_points == team2_points:
+                return None
+            return 1 if team1_points > team2_points else 2
+
         player1 = players[0]
         player2 = players[1]
         if player1.get("points_won") is None or player2.get("points_won") is None:
@@ -207,6 +262,14 @@ class MultimodalExtractor:
         if player1["points_won"] == player2["points_won"]:
             return None
         return 1 if player1["points_won"] > player2["points_won"] else 2
+
+    def _team_points_total(self, players: list[dict], *, side: int) -> int | None:
+        team_players = [player for player in players if player.get("side") == side]
+        if not team_players:
+            return None
+        if any(player.get("points_won") is None for player in team_players):
+            return None
+        return sum(player["points_won"] for player in team_players)
 
     def _as_int(self, value, default: int | None = None) -> int | None:
         if value in (None, ""):

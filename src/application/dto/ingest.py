@@ -5,6 +5,7 @@ from datetime import datetime
 @dataclass(slots=True)
 class IngestPlayerPreview:
     side: int
+    player_slot: int
     raw_name: str
     points_won: int | None
     winners: int | None
@@ -12,11 +13,13 @@ class IngestPlayerPreview:
     errors: int | None
     double_faults: int | None
     net_play_rate: float | None
+    max_serve_speed_kmh: int | None
 
 
 @dataclass(slots=True)
 class IngestPreview:
     match_code: str
+    match_type: str
     status: str
     players: list[IngestPlayerPreview]
     set_count: int | None

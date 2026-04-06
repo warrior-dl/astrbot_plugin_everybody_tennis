@@ -18,6 +18,7 @@ from .src.infrastructure.messaging.result_renderer import ResultRenderer
 from .src.infrastructure.platform.message_parser import MessageParser, MessageParserError
 from .src.infrastructure.persistence.db import DatabaseManager
 from .src.infrastructure.storage.image_store import ImageStore
+from .src.shared.match_types import MATCH_TYPE_DOUBLES, MATCH_TYPE_SINGLES
 
 PLUGIN_NAME = "astrbot_plugin_everybody_tennis"
 
@@ -104,6 +105,42 @@ class EverybodyTennisPlugin(Star):
         try:
             image_path = await self._message_parser.extract_first_image_path(event)
             preview = await self._ingest_service.ingest(
+                match_type=MATCH_TYPE_SINGLES,
+                platform=event.get_platform_name(),
+                external_group_id=str(event.get_group_id()),
+                group_name="",
+                platform_user_id=str(event.get_sender_id()),
+                submitted_by_name=event.get_sender_name(),
+                unified_msg_origin=event.unified_msg_origin,
+                source_image_path=image_path,
+            )
+        except MessageParserError as exc:
+            yield event.plain_result(ResultRenderer.ingest_error_text(str(exc)))
+            return
+        except FileNotFoundError as exc:
+            yield event.plain_result(ResultRenderer.ingest_error_text(str(exc)))
+            return
+        except ExtractionError as exc:
+            yield event.plain_result(ResultRenderer.ingest_error_text(str(exc)))
+            return
+        except ValueError as exc:
+            yield event.plain_result(ResultRenderer.ingest_error_text(str(exc)))
+            return
+
+        yield event.plain_result(ResultRenderer.ingest_preview_text(preview))
+
+    @tennis.command("双打录入")
+    async def tennis_doubles_ingest(self, event: AstrMessageEvent):
+        """录入双打比赛截图"""
+        await self._ensure_ready()
+        if not event.get_group_id():
+            yield event.plain_result("请在群聊中使用该命令。")
+            return
+
+        try:
+            image_path = await self._message_parser.extract_first_image_path(event)
+            preview = await self._ingest_service.ingest(
+                match_type=MATCH_TYPE_DOUBLES,
                 platform=event.get_platform_name(),
                 external_group_id=str(event.get_group_id()),
                 group_name="",
