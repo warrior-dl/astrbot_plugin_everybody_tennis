@@ -25,7 +25,7 @@
 4. 单打按双方 `points_won` 判定胜负；双打按前两名与后两名的队伍总点数判定胜负。
 5. 若字段完整且胜负可判定，则记录直接写入 `confirmed`。
 6. 若字段有缺失，则记录写入 `pending`，用户可后续 `/网球 确认` 或 `/网球 取消`。
-7. 当前查询和排行仅统计 `confirmed` 的 `singles` 记录，双打查询/排行后续再补。
+7. 当前单打查询和排行仅统计 `confirmed` 的 `singles` 记录，双打已支持战绩和最近比赛查询，双打排行后续再补。
 
 首版已经明确放弃的方案：
 
@@ -162,6 +162,8 @@ astrbot_plugin_everybody_tennis/
 - `/网球 删除 <记录号>`
 - `/网球 战绩 <游戏昵称>`
 - `/网球 最近 <游戏昵称> [条数]`
+- `/网球 双打战绩 <游戏昵称>`
+- `/网球 双打最近 <游戏昵称> [条数]`
 - `/网球 排行 [指标] [人数]`
 
 ### 5.1 录入
@@ -235,6 +237,11 @@ astrbot_plugin_everybody_tennis/
 
 - `matches.status == "confirmed"`
 - `matches.match_type == "singles"`
+
+双打查询当前基于：
+
+- `matches.status == "confirmed"`
+- `matches.match_type == "doubles"`
 
 当前排行支持的指标别名见 [ranking_service.py](/home/ubuntu/astrbot_plugin_everybody_tennis/src/application/services/ranking_service.py) 中的 `METRIC_ALIASES`。
 

@@ -281,6 +281,55 @@ class EverybodyTennisPlugin(Star):
             return
         yield event.plain_result(ResultRenderer.recent_matches_text(items))
 
+    @tennis.command("双打战绩")
+    async def tennis_doubles_stats(self, event: AstrMessageEvent, game_nickname: str = ""):
+        """查看双打个人战绩"""
+        await self._ensure_ready()
+        if not event.get_group_id():
+            yield event.plain_result("请在群聊中使用该命令。")
+            return
+        if not game_nickname.strip():
+            yield event.plain_result("请使用 `/网球 双打战绩 <游戏昵称>` 查询。")
+            return
+        try:
+            summary = await self._query_service.get_doubles_player_stats(
+                platform=event.get_platform_name(),
+                external_group_id=str(event.get_group_id()),
+                game_nickname=game_nickname,
+            )
+        except QueryError as exc:
+            yield event.plain_result(ResultRenderer.query_error_text(str(exc)))
+            return
+        yield event.plain_result(ResultRenderer.doubles_player_stats_text(summary))
+
+    @tennis.command("双打最近")
+    async def tennis_doubles_recent(
+        self,
+        event: AstrMessageEvent,
+        game_nickname: str = "",
+        count: int = 5,
+    ):
+        """查看最近双打比赛"""
+        await self._ensure_ready()
+        if not event.get_group_id():
+            yield event.plain_result("请在群聊中使用该命令。")
+            return
+        if not game_nickname.strip():
+            yield event.plain_result("请使用 `/网球 双打最近 <游戏昵称> [条数]` 查询。")
+            return
+        safe_count = min(max(count, 1), 10)
+        try:
+            items = await self._query_service.get_doubles_recent_matches(
+                platform=event.get_platform_name(),
+                external_group_id=str(event.get_group_id()),
+                game_nickname=game_nickname,
+                limit=safe_count,
+            )
+        except QueryError as exc:
+            yield event.plain_result(ResultRenderer.query_error_text(str(exc)))
+            return
+        yield event.plain_result(ResultRenderer.doubles_recent_matches_text(items))
+
     @tennis.command("排行")
     async def tennis_ranking(self, event: AstrMessageEvent, metric: str = "胜场", top_n: int = 10):
         """查看群排行"""

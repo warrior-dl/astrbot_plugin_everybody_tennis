@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from ...application.dto.ingest import IngestPreview
-from ...application.dto.query import PlayerStatsSummary, RecentMatchItem
+from ...application.dto.query import DoublesRecentMatchItem, PlayerStatsSummary, RecentMatchItem
 from ...application.dto.ranking import RankingEntry
 from ...shared.match_types import MATCH_TYPE_DOUBLES, match_type_label
 
@@ -20,11 +20,13 @@ class ResultRenderer:
                 "/网球 删除 <记录号>",
                 "/网球 战绩 <游戏昵称>",
                 "/网球 最近 <游戏昵称> [条数]",
+                "/网球 双打战绩 <游戏昵称>",
+                "/网球 双打最近 <游戏昵称> [条数]",
                 "/网球 排行 [指标] [人数]",
                 "",
                 "默认完整记录会直接入库，发现有误可再取消。",
                 "当前版本无需绑定昵称，查询时直接指定游戏内昵称。",
-                "当前双打处于首阶段，仅支持录入。",
+                "双打当前支持录入、战绩查询和最近比赛查询。",
                 "排行指标支持：胜场、胜率、场次、场均得分、场均胜球",
             ]
         )
@@ -142,6 +144,27 @@ class ResultRenderer:
         return "\n".join(lines)
 
     @staticmethod
+    def doubles_player_stats_text(summary: PlayerStatsSummary) -> str:
+        lines = [
+            f"{summary.display_name} 的双打战绩",
+            f"总场次: {summary.total_matches}",
+            f"胜负: {summary.wins} 胜 / {summary.losses} 负",
+            f"胜率: {summary.win_rate * 100:.1f}%",
+            f"场均得分: {ResultRenderer._format_decimal(summary.average_points_won)}",
+            f"场均胜球: {ResultRenderer._format_decimal(summary.average_winners)}",
+            f"场均发球得分: {ResultRenderer._format_decimal(summary.average_serve_points_won)}",
+            f"场均失误: {ResultRenderer._format_decimal(summary.average_errors)}",
+            f"场均双误: {ResultRenderer._format_decimal(summary.average_double_faults)}",
+        ]
+        if summary.average_net_play_rate is not None:
+            lines.append(f"平均网前截击率: {summary.average_net_play_rate * 100:.1f}%")
+        if summary.average_max_serve_speed_kmh is not None:
+            lines.append(
+                f"平均最高球速: {ResultRenderer._format_decimal(summary.average_max_serve_speed_kmh)}km/h"
+            )
+        return "\n".join(lines)
+
+    @staticmethod
     def recent_matches_text(items: Sequence[RecentMatchItem]) -> str:
         lines = ["最近比赛："]
         for item in items:
@@ -163,6 +186,34 @@ class ResultRenderer:
             )
             lines.append(
                 f"- {item.match_code} | {result} | 对手 {item.opponent_name} | {score} | {duration} | {confirmed_at}"
+            )
+        return "\n".join(lines)
+
+    @staticmethod
+    def doubles_recent_matches_text(items: Sequence[DoublesRecentMatchItem]) -> str:
+        lines = ["最近双打："]
+        for item in items:
+            result = "胜" if item.is_winner else "负"
+            team_score = (
+                f"{item.team_points_won}:{item.opponent_team_points_won}"
+                if item.team_points_won is not None and item.opponent_team_points_won is not None
+                else "比分未知"
+            )
+            player_points = item.player_points_won if item.player_points_won is not None else "?"
+            confirmed_at = (
+                item.confirmed_at.strftime("%Y-%m-%d %H:%M")
+                if item.confirmed_at is not None
+                else "时间未知"
+            )
+            duration = (
+                ResultRenderer._format_duration(item.duration_seconds)
+                if item.duration_seconds is not None
+                else "时长未知"
+            )
+            lines.append(
+                f"- {item.match_code} | {result} | 队友 {item.teammate_name} | "
+                f"对手 {' / '.join(item.opponent_names)} | 队伍比分 {team_score} | "
+                f"本人点数 {player_points} | {duration} | {confirmed_at}"
             )
         return "\n".join(lines)
 

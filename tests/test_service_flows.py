@@ -195,6 +195,36 @@ class TennisServiceFlowTests(unittest.IsolatedAsyncioTestCase):
                 game_nickname="幸",
             )
 
+        doubles_summary = await self._query_service.get_doubles_player_stats(
+            platform="test",
+            external_group_id="group-3",
+            game_nickname="幸",
+        )
+        self.assertEqual(doubles_summary.total_matches, 1)
+        self.assertEqual(doubles_summary.wins, 1)
+        self.assertAlmostEqual(doubles_summary.average_points_won, 11.0)
+        self.assertAlmostEqual(doubles_summary.average_max_serve_speed_kmh or 0.0, 131.0)
+
+        doubles_recent = await self._query_service.get_doubles_recent_matches(
+            platform="test",
+            external_group_id="group-3",
+            game_nickname="幸",
+            limit=3,
+        )
+        self.assertEqual(len(doubles_recent), 1)
+        self.assertEqual(doubles_recent[0].teammate_name, "半梦")
+        self.assertEqual(doubles_recent[0].opponent_names, ["Days-X", "COM"])
+        self.assertEqual(doubles_recent[0].team_points_won, 24)
+        self.assertEqual(doubles_recent[0].opponent_team_points_won, 9)
+        self.assertEqual(doubles_recent[0].player_points_won, 11)
+
+        with self.assertRaises(QueryError):
+            await self._query_service.get_doubles_player_stats(
+                platform="test",
+                external_group_id="group-3",
+                game_nickname="ntr",
+            )
+
     def _build_extraction(self, *, missing_fields: list[str] | None = None) -> ExtractionResult:
         payload = {
             "players": [

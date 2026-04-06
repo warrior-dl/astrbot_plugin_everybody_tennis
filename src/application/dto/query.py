@@ -15,6 +15,7 @@ class PlayerStatsSummary:
     average_errors: float
     average_double_faults: float
     average_net_play_rate: float | None
+    average_max_serve_speed_kmh: float | None = None
 
 
 @dataclass(slots=True)
@@ -25,4 +26,17 @@ class RecentMatchItem:
     opponent_name: str
     points_won: int | None
     opponent_points_won: int | None
+    duration_seconds: int | None
+
+
+@dataclass(slots=True)
+class DoublesRecentMatchItem:
+    match_code: str
+    confirmed_at: datetime | None
+    is_winner: bool
+    teammate_name: str
+    opponent_names: list[str]
+    team_points_won: int | None
+    opponent_team_points_won: int | None
+    player_points_won: int | None
     duration_seconds: int | None
