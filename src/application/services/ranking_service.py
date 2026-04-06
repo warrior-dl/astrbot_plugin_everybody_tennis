@@ -5,14 +5,15 @@ from sqlalchemy import select
 from ..dto.ranking import RankingEntry
 from ...infrastructure.config.config_manager import ConfigManager
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...infrastructure.persistence.models import Match, MatchPlayerStat
+from ._scope import GroupScopedLookup
 
 
 class RankingError(Exception):
     pass
 
 
-class RankingService:
+class RankingService(GroupScopedLookup):
     METRIC_ALIASES = {
         "胜场": "wins",
         "wins": "wins",
@@ -49,12 +50,11 @@ class RankingService:
 
         limit = top_n or self._config_manager.get_default_top_n()
         async with self._db.session() as session:
-            group_stmt = (
-                select(Group)
-                .where(Group.platform == platform)
-                .where(Group.external_group_id == external_group_id)
+            group = await self._get_group(
+                session=session,
+                platform=platform,
+                external_group_id=external_group_id,
             )
-            group = await session.scalar(group_stmt)
             if group is None:
                 raise RankingError("当前群还没有任何比赛记录。")
 

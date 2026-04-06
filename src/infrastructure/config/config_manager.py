@@ -23,18 +23,6 @@ class ConfigManager:
     def get_provider_id(self) -> str:
         return self._group("llm").get("provider_id", "")
 
-    def get_prompt_version(self) -> str:
-        return self._group("llm").get("prompt_version", "v1")
-
-    def is_strict_json_enabled(self) -> bool:
-        return self._group("llm").get("strict_json", True)
-
-    def get_timeout_seconds(self) -> int:
-        return self._group("llm").get("timeout_seconds", 60)
-
-    def keep_source_image(self) -> bool:
-        return self._group("storage").get("keep_source_image", True)
-
     def get_pending_expire_hours(self) -> int:
         return self._group("storage").get("pending_expire_hours", 24)
 
@@ -55,9 +43,3 @@ class ConfigManager:
             "extraction_user_prompt_template",
             "请从截图中提取网球比赛统计信息。",
         )
-
-    def is_debug_mode(self) -> bool:
-        return self._group("debug").get("debug_mode", False)
-
-    def should_log_llm_response(self) -> bool:
-        return self._group("debug").get("log_llm_response", False)

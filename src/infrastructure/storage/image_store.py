@@ -2,10 +2,10 @@ import asyncio
 import hashlib
 import shutil
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 from ..persistence.db import get_plugin_data_root
+from ...shared.time import utc_now
 
 
 @dataclass(slots=True)
@@ -25,7 +25,7 @@ class ImageStore:
 
         sha256 = await asyncio.to_thread(self._sha256_file, source)
         suffix = source.suffix.lower() or ".jpg"
-        month_dir = self._images_dir / datetime.utcnow().strftime("%Y%m")
+        month_dir = self._images_dir / utc_now().strftime("%Y%m")
         month_dir.mkdir(parents=True, exist_ok=True)
         destination = month_dir / f"{sha256}{suffix}"
         if not destination.exists():

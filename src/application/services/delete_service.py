@@ -1,11 +1,9 @@
 from dataclasses import dataclass
-from datetime import datetime
-
-from sqlalchemy import select
 
 from ...infrastructure.config.config_manager import ConfigManager
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Group, Match
+from ...shared.time import utc_now
+from ._scope import GroupScopedLookup
 
 
 class DeleteError(Exception):
@@ -19,7 +17,7 @@ class DeleteResult:
     message: str
 
 
-class DeleteService:
+class DeleteService(GroupScopedLookup):
     def __init__(self, db: DatabaseManager, config_manager: ConfigManager):
         self._db = db
         self._config_manager = config_manager
@@ -61,26 +59,10 @@ class DeleteService:
                 raise DeleteError("只有提交人本人或管理员可以删除该记录。")
 
             match.status = "deleted"
-            match.deleted_at = datetime.utcnow()
+            match.deleted_at = utc_now()
             await session.commit()
             return DeleteResult(
                 match_code=match.match_code,
                 status=match.status,
                 message="记录已删除，后续统计将自动忽略该记录。",
             )
-
-    async def _get_group(self, *, session, platform: str, external_group_id: str) -> Group | None:
-        stmt = (
-            select(Group)
-            .where(Group.platform == platform)
-            .where(Group.external_group_id == external_group_id)
-        )
-        return await session.scalar(stmt)
-
-    async def _get_match(self, *, session, group_id: int, match_code: str) -> Match | None:
-        stmt = (
-            select(Match)
-            .where(Match.group_id == group_id)
-            .where(Match.match_code == match_code)
-        )
-        return await session.scalar(stmt)

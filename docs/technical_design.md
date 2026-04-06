@@ -17,7 +17,7 @@
 
 首版优先保证以下三件事：
 
-- 识别结果可控，必须先确认再入库。
+- 识别结果可控，完整记录自动入库，残缺记录进入待确认。
 - 统计口径稳定，群内排行和个人战绩能长期累积。
 - 代码结构可扩展，后续能继续加修正、报表和更多统计。
 
@@ -44,10 +44,6 @@ AstrBot Command/Event
         |
         v
 Application Services
-        |
-        +--> Domain Services
-        |
-        +--> Repositories (Interface)
         |
         +--> Infrastructure
               |- LLM Extractor
@@ -87,17 +83,6 @@ Application Services
 - `query_service.py`：按游戏昵称处理个人战绩和最近比赛。
 - `ranking_service.py`：处理群排行。
 
-#### `domain/`
-
-负责 AstrBot 无关的核心业务规则。
-
-建议模块：
-
-- `entities/`：`Match`、`Player`、`Group`、`MatchPlayerStat`
-- `value_objects/`：`MatchStatus`、`RankingMetric`、`ExtractionResult`
-- `services/`：`StatCalculator`、`MatchNormalizer`、`DuplicateDetector`
-- `repositories/`：仓储接口定义
-
 #### `infrastructure/`
 
 负责与外部系统交互。
@@ -108,7 +93,6 @@ Application Services
 - `llm/multimodal_extractor.py`
 - `persistence/db.py`
 - `persistence/models.py`
-- `persistence/repositories/`
 - `storage/image_store.py`
 - `messaging/result_renderer.py`
 - `platform/message_parser.py`
@@ -130,16 +114,12 @@ astrbot_plugin_everybody_tennis/
 └── src/
     ├── application/
     │   ├── services/
+    │   │   ├── _scope.py
     │   │   ├── confirmation_service.py
     │   │   ├── ingest_service.py
     │   │   ├── query_service.py
     │   │   └── ranking_service.py
     │   └── dto/
-    ├── domain/
-    │   ├── entities/
-    │   ├── repositories/
-    │   ├── services/
-    │   └── value_objects/
     ├── infrastructure/
     │   ├── config/
     │   ├── llm/
@@ -250,10 +230,15 @@ astrbot_plugin_everybody_tennis/
 用户发送确认命令
   -> 查询 pending 记录
   -> 校验操作者权限和记录状态
-  -> 校验字段完整性
+  -> 校验当前记录仍能判定胜负
   -> 将状态改为 confirmed
   -> 查询端后续基于 confirmed 数据聚合统计
 ```
+
+取消流程允许两种入口：
+
+- 对 `pending` 记录直接取消，终止本次录入。
+- 对已自动入库的 `confirmed` 记录执行撤销，后续统计不再包含该记录。
 
 ### 7.3 删除流程
 
@@ -412,27 +397,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 - 唯一索引：`(platform, external_group_id)`
 
-#### `players`
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | INTEGER PK | 内部主键 |
-| `group_id` | INTEGER FK | 所属群 |
-| `platform_user_id` | TEXT NULL | 平台用户 ID |
-| `display_name` | TEXT | 当前展示名称 |
-| `normalized_display_name` | TEXT | 标准化展示名称 |
-| `created_at` | DATETIME | 创建时间 |
-| `updated_at` | DATETIME | 更新时间 |
-
-说明：
-
-- 首版按群建模，不做跨群合并身份。
-- `platform_user_id` 当前主要用于标记提交人和操作权限，不参与首版统计聚合。
-
-#### `player_aliases`
-
-该表保留为后续扩展预留，首版主链路不依赖它完成录入、确认和查询。
-
 #### `matches`
 
 | 字段 | 类型 | 说明 |
@@ -453,8 +417,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 | `game_count` | INTEGER | 局数 |
 | `duration_seconds` | INTEGER | 对局时长秒数 |
 | `max_rally_count` | INTEGER | 最长回合 |
-| `winner_player_id` | INTEGER NULL | 胜者 |
-| `loser_player_id` | INTEGER NULL | 负者 |
 | `expires_at` | DATETIME NULL | 待确认过期时间 |
 | `confirmed_at` | DATETIME NULL | 确认时间 |
 | `cancelled_at` | DATETIME NULL | 取消时间 |
@@ -478,7 +440,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 | `side` | INTEGER | 1 或 2 |
 | `raw_player_name` | TEXT | 提取出的昵称 |
 | `normalized_player_name` | TEXT | 标准化昵称 |
-| `player_id` | INTEGER NULL | 解析后的玩家 ID |
 | `is_winner` | BOOL | 是否获胜 |
 | `points_won` | INTEGER | 点数取得次数 |
 | `winners` | INTEGER | 胜球次数 |
@@ -491,27 +452,6 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 约束：
 
 - 唯一索引：`(match_id, side)`
-
-说明：
-
-- `player_id` 允许在待确认阶段为空。
-- 确认前必须解析并写入双方 `player_id`。
-
-#### `extraction_logs`
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| `id` | INTEGER PK | 主键 |
-| `match_id` | INTEGER FK | 对应比赛 |
-| `provider_id` | TEXT | 使用的 provider |
-| `model_name` | TEXT | 模型名 |
-| `prompt_version` | TEXT | 提示词版本 |
-| `request_payload_json` | TEXT | 发送给模型的请求摘要 |
-| `response_text` | TEXT | 原始响应文本 |
-| `parse_success` | BOOL | 是否解析成功 |
-| `parse_error` | TEXT NULL | 解析错误 |
-| `latency_ms` | INTEGER | 调用耗时 |
-| `created_at` | DATETIME | 创建时间 |
 
 ### 10.4 记录号设计
 
@@ -549,9 +489,10 @@ confirmed -> deleted
 ### 11.2 状态校验规则
 
 - 只有 `pending` 状态允许确认。
-- 只有记录提交人或管理员可以取消 `pending` 记录。
+- 只有记录提交人可以确认自己的 `pending` 记录。
+- 只有记录提交人可以取消 `pending` 或撤销 `confirmed` 记录。
 - 只有提交人或管理员可以删除记录。
-- `missing_fields` 非空或 `player_id` 未完全解析时，不允许确认。
+- `missing_fields` 非空时，不允许确认。
 
 ## 12. 统计与排行设计
 
@@ -571,7 +512,6 @@ confirmed -> deleted
 
 - `matches.status = confirmed`
 - `matches.deleted_at IS NULL`
-- `match_player_stats.player_id IS NOT NULL`
 
 ### 12.3 支持的核心指标
 
@@ -684,13 +624,9 @@ confirmed -> deleted
 #### `llm`
 
 - `provider_id: string = ""`
-- `prompt_version: string = "v1"`
-- `strict_json: bool = true`
-- `timeout_seconds: int = 60`
 
 #### `storage`
 
-- `keep_source_image: bool = true`
 - `pending_expire_hours: int = 24`
 
 #### `ranking`
@@ -702,11 +638,6 @@ confirmed -> deleted
 
 - `extraction_system_prompt: text`
 - `extraction_user_prompt_template: text`
-
-#### `debug`
-
-- `debug_mode: bool = false`
-- `log_llm_response: bool = false`
 
 ### 15.3 `ConfigManager` 职责
 

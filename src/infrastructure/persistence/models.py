@@ -3,9 +3,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-
-def utcnow() -> datetime:
-    return datetime.utcnow()
+from ...shared.time import utc_now
 
 
 class Base(DeclarativeBase):
@@ -22,42 +20,7 @@ class Group(Base):
     platform: Mapped[str] = mapped_column(String(64), nullable=False)
     external_group_id: Mapped[str] = mapped_column(String(128), nullable=False)
     group_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-
-
-class Player(Base):
-    __tablename__ = "players"
-    __table_args__ = (
-        UniqueConstraint("group_id", "platform_user_id", name="uq_players_group_user"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
-    platform_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    normalized_display_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=utcnow,
-        onupdate=utcnow,
-        nullable=False,
-    )
-
-
-class PlayerAlias(Base):
-    __tablename__ = "player_aliases"
-    __table_args__ = (
-        UniqueConstraint("player_id", "normalized_alias", name="uq_player_aliases_player_alias"),
-        UniqueConstraint("group_id", "normalized_alias", name="uq_player_aliases_group_alias"),
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
-    player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), nullable=False)
-    alias: Mapped[str] = mapped_column(String(255), nullable=False)
-    normalized_alias: Mapped[str] = mapped_column(String(255), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class Match(Base):
@@ -85,17 +48,15 @@ class Match(Base):
     game_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_rally_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    winner_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
-    loser_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
-        default=utcnow,
-        onupdate=utcnow,
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
     )
 
@@ -111,7 +72,6 @@ class MatchPlayerStat(Base):
     side: Mapped[int] = mapped_column(Integer, nullable=False)
     raw_player_name: Mapped[str] = mapped_column(String(255), nullable=False)
     normalized_player_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), nullable=True)
     is_winner: Mapped[bool] = mapped_column(nullable=False, default=False)
     points_won: Mapped[int | None] = mapped_column(Integer, nullable=True)
     winners: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -119,21 +79,4 @@ class MatchPlayerStat(Base):
     errors: Mapped[int | None] = mapped_column(Integer, nullable=True)
     double_faults: Mapped[int | None] = mapped_column(Integer, nullable=True)
     net_play_rate: Mapped[float | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-
-
-class ExtractionLog(Base):
-    __tablename__ = "extraction_logs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), nullable=False)
-    provider_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    model_name: Mapped[str] = mapped_column(String(128), nullable=False)
-    prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
-    request_payload_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    parse_success: Mapped[bool] = mapped_column(nullable=False, default=False)
-    parse_error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
-
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

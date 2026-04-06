@@ -1,11 +1,11 @@
-import json
 from dataclasses import dataclass
-from datetime import datetime
 
 from sqlalchemy import select
 
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...infrastructure.persistence.models import MatchPlayerStat
+from ...shared.time import utc_now
+from ._scope import GroupScopedLookup
 
 
 class ConfirmationError(Exception):
@@ -19,7 +19,7 @@ class ConfirmationResult:
     message: str
 
 
-class ConfirmationService:
+class ConfirmationService(GroupScopedLookup):
     def __init__(self, db: DatabaseManager):
         self._db = db
 
@@ -54,28 +54,20 @@ class ConfirmationService:
             if match.status != "pending":
                 raise ConfirmationError(f"该记录当前状态为 {match.status}，不能再次确认。")
 
-            if match.expires_at is not None and match.expires_at <= datetime.utcnow():
+            if match.expires_at is not None and match.expires_at <= utc_now():
                 match.status = "expired"
                 await session.commit()
                 raise ConfirmationError("该记录已过期，请重新录入。")
 
             stats = await self._get_match_stats(session=session, match_id=match.id)
 
-            missing_fields = self._load_missing_fields(match.missing_fields_json)
-            if missing_fields:
-                raise ConfirmationError(
-                    "当前记录字段不完整，缺失: " + ", ".join(missing_fields)
-                )
-
             winner_stat = next((stat for stat in stats if stat.is_winner), None)
             loser_stat = next((stat for stat in stats if not stat.is_winner), None)
             if winner_stat is None or loser_stat is None:
                 raise ConfirmationError("当前记录无法确定胜负方。")
 
-            match.winner_player_id = winner_stat.player_id
-            match.loser_player_id = loser_stat.player_id
             match.status = "confirmed"
-            match.confirmed_at = datetime.utcnow()
+            match.confirmed_at = utc_now()
             await session.commit()
             return ConfirmationResult(
                 match_code=match.match_code,
@@ -114,7 +106,7 @@ class ConfirmationService:
 
             original_status = match.status
             match.status = "cancelled"
-            match.cancelled_at = datetime.utcnow()
+            match.cancelled_at = utc_now()
             if original_status == "confirmed":
                 match.confirmed_at = None
             await session.commit()
@@ -124,22 +116,6 @@ class ConfirmationService:
                 message="记录已取消，后续统计将不再包含该记录。",
             )
 
-    async def _get_group(self, *, session, platform: str, external_group_id: str) -> Group | None:
-        stmt = (
-            select(Group)
-            .where(Group.platform == platform)
-            .where(Group.external_group_id == external_group_id)
-        )
-        return await session.scalar(stmt)
-
-    async def _get_match(self, *, session, group_id: int, match_code: str) -> Match | None:
-        stmt = (
-            select(Match)
-            .where(Match.group_id == group_id)
-            .where(Match.match_code == match_code)
-        )
-        return await session.scalar(stmt)
-
     async def _get_match_stats(self, *, session, match_id: int) -> list[MatchPlayerStat]:
         stmt = (
             select(MatchPlayerStat)
@@ -148,14 +124,3 @@ class ConfirmationService:
         )
         result = await session.scalars(stmt)
         return list(result.all())
-
-    def _load_missing_fields(self, payload: str | None) -> list[str]:
-        if not payload:
-            return []
-        try:
-            loaded = json.loads(payload)
-        except json.JSONDecodeError:
-            return []
-        if not isinstance(loaded, list):
-            return []
-        return [str(item) for item in loaded]

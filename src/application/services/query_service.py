@@ -1,16 +1,16 @@
-from sqlalchemy import select
-
 from ..dto.query import PlayerStatsSummary, RecentMatchItem
 from ...infrastructure.persistence.db import DatabaseManager
-from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
+from ...infrastructure.persistence.models import Match, MatchPlayerStat
 from ...shared.text import normalize_name
+from ._scope import GroupScopedLookup
+from sqlalchemy import select
 
 
 class QueryError(Exception):
     pass
 
 
-class QueryService:
+class QueryService(GroupScopedLookup):
     def __init__(self, db: DatabaseManager):
         self._db = db
 
@@ -134,17 +134,3 @@ class QueryService:
                     )
                 )
             return results
-
-    async def _get_group(
-        self,
-        *,
-        platform: str,
-        external_group_id: str,
-        session,
-    ) -> Group | None:
-        stmt = (
-            select(Group)
-            .where(Group.platform == platform)
-            .where(Group.external_group_id == external_group_id)
-        )
-        return await session.scalar(stmt)

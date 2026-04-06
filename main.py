@@ -61,7 +61,6 @@ class EverybodyTennisPlugin(Star):
         self._initialized = False
         self._terminating = False
         self._init_lock = asyncio.Lock()
-        self._background_tasks: set[asyncio.Task] = set()
 
     @filter.on_platform_loaded()
     async def on_platform_loaded(self):
@@ -269,9 +268,4 @@ class EverybodyTennisPlugin(Star):
         if self._terminating:
             return
         self._terminating = True
-        for task in self._background_tasks:
-            if not task.done():
-                task.cancel()
-        if self._background_tasks:
-            await asyncio.wait(list(self._background_tasks), timeout=3.0)
         await self._db.close()

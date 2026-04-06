@@ -6,8 +6,6 @@ from datetime import datetime
 class IngestPlayerPreview:
     side: int
     raw_name: str
-    resolved_display_name: str | None
-    resolved: bool
     points_won: int | None
     winners: int | None
     serve_points_won: int | None

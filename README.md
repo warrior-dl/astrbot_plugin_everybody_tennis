@@ -17,8 +17,8 @@
 
 1. 群友发送指令并附带比赛截图。
 2. 插件调用多模态模型提取双方比赛数据。
-3. 插件生成待确认记录，避免误识别直接污染统计。
-4. 用户确认后入库。
+3. 插件回显识别预览。
+4. 字段完整且可判定胜负时自动入库；字段缺失时保留为待确认记录。
 5. 后续可查询个人战绩、最近比赛和群排行。
 
 设计文档见：
@@ -32,6 +32,7 @@
 
 - `/网球 帮助`
 - `/网球 录入`
+- `/网球 确认 <记录号>`
 - `/网球 取消 <记录号>`
 - `/网球 删除 <记录号>`
 - `/网球 战绩 <游戏昵称>`
@@ -68,7 +69,6 @@ astrbot_plugin_everybody_tennis/
 ├── docs/
 └── src/
     ├── application/
-    ├── domain/
     ├── infrastructure/
     └── shared/
 ```
@@ -87,7 +87,6 @@ pip install -r requirements.txt
 
 - `SQLAlchemy`
 - `aiosqlite`
-- `pydantic`
 
 ### 2. 安装到 AstrBot 插件目录
 
@@ -108,7 +107,6 @@ data/plugins/astrbot_plugin_everybody_tennis/
 - `storage`
 - `ranking`
 - `prompts`
-- `debug`
 
 关键配置：
 
@@ -135,6 +133,8 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 
 - `tennis.db` 为 SQLite 数据库
 - `images/` 保存归档后的比赛截图
+
+如果你本地跑过旧版本，建议删除旧的 `data/plugin_data/astrbot_plugin_everybody_tennis/tennis.db` 后再启动，让当前精简后的 schema 直接重建。
 
 ## 使用说明
 
@@ -204,7 +204,7 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 ```text
 /网球 排行
 /网球 排行 胜率
-/网球 排行 得分 5
+/网球 排行 场均得分 5
 ```
 
 当前支持的排行指标：
@@ -212,8 +212,8 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
 - `胜场`
 - `胜率`
 - `场次`
-- `得分`
-- `胜球`
+- `场均得分`
+- `场均胜球`
 
 ## 识别流程说明
 
@@ -229,17 +229,15 @@ data/plugin_data/astrbot_plugin_everybody_tennis/
   -> 用户可取消，或对 pending 记录补确认
 ```
 
-之所以要求确认，是因为图片识别天然存在误差。首版优先保证统计可信度，而不是追求零交互自动入库。
+之所以保留确认入口，是因为图片识别天然存在误差。当前策略是：完整记录自动入库，只有字段缺失时才进入显式确认流程。
 
 ## 数据模型概览
 
 当前核心表：
 
 - `groups`
-- `players`
 - `matches`
 - `match_player_stats`
-- `extraction_logs`
 
 记录状态：
 

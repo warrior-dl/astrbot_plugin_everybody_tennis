@@ -29,21 +29,6 @@
         "description": "用于图片提取的 Provider",
         "_special": "select_provider",
         "default": ""
-      },
-      "prompt_version": {
-        "type": "string",
-        "description": "提示词版本",
-        "default": "v1"
-      },
-      "strict_json": {
-        "type": "bool",
-        "description": "要求模型严格输出 JSON",
-        "default": true
-      },
-      "timeout_seconds": {
-        "type": "int",
-        "description": "LLM 请求超时秒数",
-        "default": 60
       }
     }
   },
@@ -51,11 +36,6 @@
     "description": "存储设置",
     "type": "object",
     "items": {
-      "keep_source_image": {
-        "type": "bool",
-        "description": "保留原始截图",
-        "default": true
-      },
       "pending_expire_hours": {
         "type": "int",
         "description": "待确认记录过期时间（小时）",
@@ -94,22 +74,5 @@
         "default": "请从这张网球比赛结果截图中提取双方玩家昵称、局数、时长、最长回合和技术统计，并输出为 JSON。"
       }
     }
-  },
-  "debug": {
-    "description": "调试设置",
-    "type": "object",
-    "items": {
-      "debug_mode": {
-        "type": "bool",
-        "description": "启用调试模式",
-        "default": false
-      },
-      "log_llm_response": {
-        "type": "bool",
-        "description": "记录模型原始响应",
-        "default": false
-      }
-    }
   }
 }
-

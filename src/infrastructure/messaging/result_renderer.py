@@ -13,6 +13,7 @@ class ResultRenderer:
                 "网球插件当前可用命令：",
                 "/网球 帮助",
                 "/网球 录入",
+                "/网球 确认 <记录号>",
                 "/网球 取消 <记录号>",
                 "/网球 删除 <记录号>",
                 "/网球 战绩 <游戏昵称>",
@@ -33,11 +34,8 @@ class ResultRenderer:
             f"状态: {preview.status}",
         ]
         for player in preview.players:
-            display_name = player.raw_name
-            if player.resolved and player.resolved_display_name:
-                display_name = f"{player.raw_name} ({player.resolved_display_name})"
             lines.append(
-                f"玩家{player.side}: {display_name} | 点数 {player.points_won if player.points_won is not None else '?'}"
+                f"玩家{player.side}: {player.raw_name} | 点数 {player.points_won if player.points_won is not None else '?'}"
             )
         if preview.set_count is not None or preview.game_count is not None:
             lines.append(

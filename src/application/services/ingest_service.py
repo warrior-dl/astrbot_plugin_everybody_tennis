@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -11,6 +11,7 @@ from ...infrastructure.persistence.db import DatabaseManager
 from ...infrastructure.persistence.models import Group, Match, MatchPlayerStat
 from ...infrastructure.storage.image_store import ImageStore
 from ...shared.text import normalize_name
+from ...shared.time import utc_now
 
 
 class IngestService:
@@ -46,7 +47,7 @@ class IngestService:
         winner_side = extraction.normalized_payload.get("winner_side")
         auto_confirmed = not missing_fields and winner_side in {1, 2}
 
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = utc_now() + timedelta(
             hours=self._config_manager.get_pending_expire_hours()
         )
 
@@ -81,7 +82,7 @@ class IngestService:
                 duration_seconds=extraction.normalized_payload.get("duration_seconds"),
                 max_rally_count=extraction.normalized_payload.get("max_rally_count"),
                 expires_at=None if auto_confirmed else expires_at,
-                confirmed_at=datetime.utcnow() if auto_confirmed else None,
+                confirmed_at=utc_now() if auto_confirmed else None,
             )
             session.add(match)
             await session.flush()
@@ -93,7 +94,6 @@ class IngestService:
                     side=player_payload["side"],
                     raw_player_name=player_payload["name"],
                     normalized_player_name=normalize_name(player_payload["name"]),
-                    player_id=None,
                     is_winner=winner_side == player_payload["side"],
                     points_won=player_payload.get("points_won"),
                     winners=player_payload.get("winners"),
@@ -107,8 +107,6 @@ class IngestService:
                     IngestPlayerPreview(
                         side=player_payload["side"],
                         raw_name=player_payload["name"],
-                        resolved_display_name=None,
-                        resolved=False,
                         points_won=player_payload.get("points_won"),
                         winners=player_payload.get("winners"),
                         serve_points_won=player_payload.get("serve_points_won"),
@@ -180,5 +178,5 @@ class IngestService:
         return await session.scalar(stmt)
 
     def _generate_match_code(self) -> str:
-        now = datetime.utcnow()
+        now = utc_now()
         return f"TEN-{now:%Y%m%d-%H%M%S}-{uuid4().hex[:4].upper()}"
