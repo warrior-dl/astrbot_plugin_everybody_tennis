@@ -9,11 +9,11 @@ class PlayerStatsSummary:
     wins: int
     losses: int
     win_rate: float
-    total_points_won: int
-    total_winners: int
-    total_serve_points_won: int
-    total_errors: int
-    total_double_faults: int
+    average_points_won: float
+    average_winners: float
+    average_serve_points_won: float
+    average_errors: float
+    average_double_faults: float
     average_net_play_rate: float | None
 
 
@@ -26,4 +26,3 @@ class RecentMatchItem:
     points_won: int | None
     opponent_points_won: int | None
     duration_seconds: int | None
-

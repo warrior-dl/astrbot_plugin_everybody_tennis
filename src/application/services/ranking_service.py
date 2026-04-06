@@ -21,10 +21,14 @@ class RankingService:
         "win_rate": "win_rate",
         "场次": "matches",
         "matches": "matches",
-        "得分": "points",
-        "points": "points",
-        "胜球": "winners",
-        "winners": "winners",
+        "场均得分": "avg_points",
+        "得分": "avg_points",
+        "avg_points": "avg_points",
+        "points": "avg_points",
+        "场均胜球": "avg_winners",
+        "胜球": "avg_winners",
+        "avg_winners": "avg_winners",
+        "winners": "avg_winners",
     }
 
     def __init__(self, db: DatabaseManager, config_manager: ConfigManager):
@@ -41,7 +45,7 @@ class RankingService:
     ) -> tuple[str, list[RankingEntry]]:
         metric_key = self.METRIC_ALIASES.get(metric.strip().lower()) or self.METRIC_ALIASES.get(metric.strip())
         if metric_key is None:
-            raise RankingError("不支持的排行指标，可用：胜场、胜率、场次、得分、胜球。")
+            raise RankingError("不支持的排行指标，可用：胜场、胜率、场次、场均得分、场均胜球。")
 
         limit = top_n or self._config_manager.get_default_top_n()
         async with self._db.session() as session:
@@ -130,8 +134,8 @@ class RankingService:
             return bucket["wins"] / bucket["matches"] if bucket["matches"] else 0.0
         if metric_key == "matches":
             return float(bucket["matches"])
-        if metric_key == "points":
-            return float(bucket["points"])
-        if metric_key == "winners":
-            return float(bucket["winners"])
+        if metric_key == "avg_points":
+            return bucket["points"] / bucket["matches"] if bucket["matches"] else 0.0
+        if metric_key == "avg_winners":
+            return bucket["winners"] / bucket["matches"] if bucket["matches"] else 0.0
         raise RankingError("未知排行指标。")

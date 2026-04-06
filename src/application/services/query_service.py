@@ -63,11 +63,15 @@ class QueryService:
                 wins=wins,
                 losses=total_matches - wins,
                 win_rate=wins / total_matches if total_matches else 0.0,
-                total_points_won=total_points,
-                total_winners=total_winners,
-                total_serve_points_won=total_serve_points,
-                total_errors=total_errors,
-                total_double_faults=total_double_faults,
+                average_points_won=total_points / total_matches if total_matches else 0.0,
+                average_winners=total_winners / total_matches if total_matches else 0.0,
+                average_serve_points_won=(
+                    total_serve_points / total_matches if total_matches else 0.0
+                ),
+                average_errors=total_errors / total_matches if total_matches else 0.0,
+                average_double_faults=(
+                    total_double_faults / total_matches if total_matches else 0.0
+                ),
                 average_net_play_rate=(
                     sum(net_rates) / len(net_rates) if net_rates else None
                 ),

@@ -21,7 +21,7 @@ class ResultRenderer:
                 "",
                 "默认完整记录会直接入库，发现有误可再取消。",
                 "当前版本无需绑定昵称，查询时直接指定游戏内昵称。",
-                "排行指标支持：胜场、胜率、场次、得分、胜球",
+                "排行指标支持：胜场、胜率、场次、场均得分、场均胜球",
             ]
         )
 
@@ -103,11 +103,11 @@ class ResultRenderer:
             f"总场次: {summary.total_matches}",
             f"胜负: {summary.wins} 胜 / {summary.losses} 负",
             f"胜率: {summary.win_rate * 100:.1f}%",
-            f"累计得分: {summary.total_points_won}",
-            f"累计胜球: {summary.total_winners}",
-            f"累计发球得分: {summary.total_serve_points_won}",
-            f"累计失误: {summary.total_errors}",
-            f"累计双误: {summary.total_double_faults}",
+            f"场均得分: {ResultRenderer._format_decimal(summary.average_points_won)}",
+            f"场均胜球: {ResultRenderer._format_decimal(summary.average_winners)}",
+            f"场均发球得分: {ResultRenderer._format_decimal(summary.average_serve_points_won)}",
+            f"场均失误: {ResultRenderer._format_decimal(summary.average_errors)}",
+            f"场均双误: {ResultRenderer._format_decimal(summary.average_double_faults)}",
         ]
         if summary.average_net_play_rate is not None:
             lines.append(f"平均网前截击率: {summary.average_net_play_rate * 100:.1f}%")
@@ -144,13 +144,15 @@ class ResultRenderer:
             "wins": "胜场",
             "win_rate": "胜率",
             "matches": "场次",
-            "points": "得分",
-            "winners": "胜球",
+            "avg_points": "场均得分",
+            "avg_winners": "场均胜球",
         }.get(metric_key, metric_key)
         lines = [f"群排行 - {metric_name}"]
         for entry in entries:
             if metric_key == "win_rate":
                 value_str = f"{entry.value * 100:.1f}%"
+            elif metric_key in {"avg_points", "avg_winners"}:
+                value_str = ResultRenderer._format_decimal(entry.value)
             else:
                 value_str = str(int(entry.value))
             detail_parts = [f"{metric_name} {value_str}"]
@@ -169,3 +171,9 @@ class ResultRenderer:
         minutes = (seconds % 3600) // 60
         remain = seconds % 60
         return f"{hours:02d}:{minutes:02d}:{remain:02d}"
+
+    @staticmethod
+    def _format_decimal(value: float) -> str:
+        text = f"{value:.2f}"
+        text = text.rstrip("0").rstrip(".")
+        return text if text else "0"
